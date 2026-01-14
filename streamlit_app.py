@@ -19,6 +19,35 @@ def img_to_base64(path):
         return base64.b64encode(f.read()).decode()
 
 
+def get_ey_logo_path() -> Optional[str]:
+    """
+    Get the appropriate EY logo path based on current theme
+    
+    Returns:
+        Path to EY logo file, or None if no logo is available
+    """
+    current_theme = st.session_state.get("theme", "dark")
+    
+    if current_theme == "dark":
+        dark_logo = "assets/ey_logo_dark.png"
+        if os.path.exists(dark_logo):
+            return dark_logo
+        # Fallback to generic logo if dark-specific doesn't exist
+        generic_logo = "assets/ey_logo.png"
+        if os.path.exists(generic_logo):
+            return generic_logo
+    else:  # light mode
+        light_logo = "assets/ey_logo_light.png"
+        if os.path.exists(light_logo):
+            return light_logo
+        # Fallback to generic logo if light-specific doesn't exist
+        generic_logo = "assets/ey_logo.png"
+        if os.path.exists(generic_logo):
+            return generic_logo
+    
+    return None
+
+
 # Page configuration - MUST be first Streamlit command
 st.set_page_config(
     page_title="HR AI Agent - Talent Intelligence Platform",
@@ -30,83 +59,217 @@ st.set_page_config(
 # Load environment variables
 load_dotenv()
 
-# Enterprise Professional Theme CSS (LinkedIn/Workday Style)
-ENTERPRISE_CSS = """
+# Initialize theme in session state (must be before CSS injection)
+if "theme" not in st.session_state:
+    st.session_state.theme = "dark"
+
+# Centralized theme configuration
+THEME_CONFIG = {
+    "dark": {
+        "app_bg": "linear-gradient(135deg, #0f1419 0%, #1a1f2e 50%, #0f1419 100%)",
+        "sidebar_bg": "linear-gradient(180deg, #1a1f2e 0%, #0f1419 100%)",
+        "text_primary": "#e8eaed",
+        "text_secondary": "#9aa0a6",
+        "text_muted": "#9aa0a6",
+        "input_bg": "#1e293b",
+        "input_border": "#3d4043",
+        "input_text": "#e8eaed",
+        "card_bg": "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)",
+        "card_border": "#334155",
+        "expander_header_bg": "#1e293b",
+        "expander_content_bg": "#0f172a",
+        "info_bg": "#1e293b",
+        "success_bg": "#1e293b",
+        "warning_bg": "#1e293b",
+        "error_bg": "#1e293b",
+        "dataframe_bg": "#1e293b",
+        "dataframe_text": "#e0e0e0",
+        "radio_bg": "#1e293b",
+        "radio_border": "#334155",
+        "uploader_bg": "#1e293b",
+        "uploader_border": "#3d4043",
+        "multiselect_bg": "#1e293b",
+        "multiselect_border": "#3d4043",
+        "multiselect_text": "#e8eaed",
+        "accent": "#0a66c2",
+        "accent_hover": "#004182",
+        "accent_light": "#3b82f6",
+        "score_high": "#10b981",
+        "score_medium": "#f59e0b",
+        "score_low": "#ef4444",
+        "border": "#3d4043",
+        "icon_color": "#9aa0a6",
+        "surface": "#1e293b",
+        "background": "#0f1419",
+    },
+    "light": {
+        "app_bg": "linear-gradient(135deg, #f5f7fa 0%, #ffffff 50%, #f5f7fa 100%)",
+        "sidebar_bg": "linear-gradient(180deg, #ffffff 0%, #f5f7fa 100%)",
+        "text_primary": "#1d1d1f",
+        "text_secondary": "#4a5568",
+        "text_muted": "#6b7280",
+        "input_bg": "#ffffff",
+        "input_border": "#d1d5db",
+        "input_text": "#1d1d1f",
+        "card_bg": "linear-gradient(135deg, #ffffff 0%, #f9fafb 100%)",
+        "card_border": "#e5e7eb",
+        "expander_header_bg": "#ffffff",
+        "expander_content_bg": "#f9fafb",
+        "info_bg": "#eff6ff",
+        "success_bg": "#f0fdf4",
+        "warning_bg": "#fffbeb",
+        "error_bg": "#fef2f2",
+        "dataframe_bg": "#ffffff",
+        "dataframe_text": "#1d1d1f",
+        "radio_bg": "#ffffff",
+        "radio_border": "#e5e7eb",
+        "uploader_bg": "#ffffff",
+        "uploader_border": "#d1d5db",
+        "multiselect_bg": "#ffffff",
+        "multiselect_border": "#d1d5db",
+        "multiselect_text": "#1d1d1f",
+        "accent": "#0a66c2",
+        "accent_hover": "#004182",
+        "accent_light": "#3b82f6",
+        "score_high": "#10b981",
+        "score_medium": "#f59e0b",
+        "score_low": "#ef4444",
+        "border": "#d1d5db",
+        "icon_color": "#4a5568",
+        "surface": "#ffffff",
+        "background": "#f5f7fa",
+    }
+}
+
+def get_theme() -> dict:
+    """Get current theme configuration"""
+    return THEME_CONFIG.get(st.session_state.theme, THEME_CONFIG["dark"])
+
+def get_theme_css(theme: str) -> str:
+    """
+    Get CSS based on selected theme (dark or light)
+    Uses centralized THEME_CONFIG for consistent colors
+    
+    Args:
+        theme: "dark" or "light"
+        
+    Returns:
+        CSS string for the selected theme
+    """
+    colors = THEME_CONFIG.get(theme, THEME_CONFIG["dark"])
+    
+    return f"""
 <style>
     /* Import professional font */
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
     
-    /* Main background - professional dark theme */
-    .stApp {
-        background: linear-gradient(135deg, #0f1419 0%, #1a1f2e 50%, #0f1419 100%);
+    /* Main background */
+    .stApp {{
+        background: {colors["app_bg"]};
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    }
+    }}
     
     /* Sidebar styling */
-    [data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #1a1f2e 0%, #0f1419 100%);
+    [data-testid="stSidebar"] {{
+        background: {colors["sidebar_bg"]};
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    }
+    }}
     
     /* Headers - professional styling */
-    h1, h2, h3 {
-        color: #e8eaed !important;
+    h1, h2, h3 {{
+        color: {colors["text_primary"]} !important;
         font-weight: 600;
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
         letter-spacing: -0.02em;
-    }
+    }}
     
     /* Body text */
-    p, div, span, label {
+    p, div, span {{
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    }
+        color: {colors["text_primary"]};
+    }}
+    
+    /* Labels - ensure visibility in both themes */
+    label,
+    [data-testid="stWidgetLabel"],
+    [data-testid="stWidgetLabel"] p {{
+        color: {colors["text_primary"]} !important;
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }}
+    
+    /* Placeholder text */
+    input::placeholder,
+    textarea::placeholder {{
+        color: {colors["text_secondary"]} !important;
+        opacity: 0.7;
+    }}
     
     /* Text areas - professional styling */
-    .stTextArea > div > div > textarea {
-        background-color: #1e293b;
-        color: #e8eaed;
-        border: 1px solid #3d4043;
+    .stTextArea > div > div > textarea {{
+        background-color: {colors["input_bg"]};
+        color: {colors["input_text"]};
+        border: 1px solid {colors["input_border"]};
         border-radius: 6px;
         padding: 12px;
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
         font-size: 0.95rem;
-    }
+    }}
     
-    .stTextArea > div > div > textarea:focus {
-        border-color: #0a66c2;
+    .stTextArea > div > div > textarea:focus {{
+        border-color: {colors["accent"]};
         box-shadow: 0 0 0 2px rgba(10, 102, 194, 0.15);
         outline: none;
-    }
+    }}
     
     /* Text inputs - professional styling */
-    .stTextInput > div > div > input {
-        background-color: #1e293b;
-        color: #e8eaed;
-        border: 1px solid #3d4043;
+    .stTextInput > div > div > input {{
+        background-color: {colors["input_bg"]};
+        color: {colors["input_text"]};
+        border: 1px solid {colors["input_border"]};
         border-radius: 6px;
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
         font-size: 0.95rem;
-    }
+    }}
     
-    .stTextInput > div > div > input:focus {
-        border-color: #0a66c2;
+    .stTextInput > div > div > input:focus {{
+        border-color: {colors["accent"]};
         box-shadow: 0 0 0 2px rgba(10, 102, 194, 0.15);
         outline: none;
-    }
+    }}
     
     /* Select boxes - professional styling */
-    .stSelectbox > div > div > select {
-        background-color: #1e293b;
-        color: #e8eaed;
-        border: 1px solid #3d4043;
+    .stSelectbox > div > div > select {{
+        background-color: {colors["input_bg"]} !important;
+        color: {colors["input_text"]} !important;
+        border: 1px solid {colors["input_border"]} !important;
         border-radius: 6px;
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
         font-size: 0.95rem;
-    }
+    }}
+    
+    /* Selectbox dropdown arrow - theme-aware */
+    .stSelectbox svg,
+    .stSelectbox [data-baseweb="select"] svg {{
+        fill: {colors["icon_color"]} !important;
+        color: {colors["icon_color"]} !important;
+        opacity: 1 !important;
+    }}
+    
+    /* Selectbox label and text */
+    .stSelectbox label,
+    .stSelectbox [data-baseweb="select"] {{
+        color: {colors["text_primary"]} !important;
+    }}
+    
+    /* Selectbox selected value */
+    .stSelectbox [data-baseweb="select"] > div {{
+        color: {colors["input_text"]} !important;
+        background-color: {colors["input_bg"]} !important;
+    }}
     
     /* Premium Buttons - LinkedIn/Workday style */
-    .stButton > button {
-        background: #0a66c2;
+    .stButton > button {{
+        background: {colors["accent"]};
         color: white;
         border: none;
         border-radius: 6px;
@@ -116,158 +279,191 @@ ENTERPRISE_CSS = """
         font-size: 0.95rem;
         transition: all 0.2s ease;
         box-shadow: 0 2px 4px rgba(10, 102, 194, 0.2);
-    }
+    }}
     
-    .stButton > button:hover {
-        background: #004182;
+    .stButton > button:hover {{
+        background: {colors["accent_hover"]};
         transform: translateY(-1px);
         box-shadow: 0 4px 8px rgba(10, 102, 194, 0.3);
-    }
+    }}
     
-    .stButton > button:disabled {
-        background: #3d3d3d;
-        color: #8e8e8e;
+    .stButton > button:disabled {{
+        background: {colors["border"]} !important;
+        color: {colors["text_secondary"]} !important;
         cursor: not-allowed;
         transform: none;
         box-shadow: none;
-    }
+    }}
     
     /* Metrics - professional styling */
-    [data-testid="stMetricValue"] {
-        color: #0a66c2 !important;
+    [data-testid="stMetricValue"] {{
+        color: {colors["accent"]} !important;
         font-size: 2rem;
         font-weight: 600;
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    }
+    }}
     
-    [data-testid="stMetricLabel"] {
-        color: #9aa0a6 !important;
+    [data-testid="stMetricLabel"] {{
+        color: {colors["text_secondary"]} !important;
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
         font-size: 0.9rem;
-    }
+    }}
     
     /* Expanders - professional styling */
-    .streamlit-expanderHeader {
-        background-color: #1e293b;
-        color: #e8eaed;
+    .streamlit-expanderHeader {{
+        background-color: {colors["expander_header_bg"]} !important;
+        color: {colors["text_primary"]} !important;
         border-radius: 6px;
         padding: 1rem;
-        border: 1px solid #3d4043;
+        border: 1px solid {colors["input_border"]} !important;
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
         font-weight: 500;
-    }
+    }}
     
-    .streamlit-expanderContent {
-        background-color: #0f172a;
+    /* Expander arrow/chevron - theme-aware */
+    .streamlit-expanderHeader svg,
+    .streamlit-expanderHeader [data-testid="stExpanderToggleIcon"] {{
+        fill: {colors["icon_color"]} !important;
+        color: {colors["icon_color"]} !important;
+        opacity: 1 !important;
+    }}
+    
+    .streamlit-expanderContent {{
+        background-color: {colors["expander_content_bg"]} !important;
         border-radius: 0 0 6px 6px;
         padding: 1.5rem;
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
         line-height: 1.6;
-    }
+        color: {colors["text_primary"]} !important;
+    }}
+    
+    /* Sidebar expander arrows */
+    [data-testid="stSidebar"] .streamlit-expanderHeader svg {{
+        fill: {colors["icon_color"]} !important;
+        color: {colors["icon_color"]} !important;
+        opacity: 1 !important;
+    }}
     
     /* Info boxes - professional styling */
-    .stInfo {
-        background-color: #1e293b;
-        border-left: 3px solid #0a66c2;
+    .stInfo {{
+        background-color: {colors["info_bg"]};
+        border-left: 3px solid {colors["accent"]};
         border-radius: 6px;
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    }
+        color: {colors["text_primary"]};
+    }}
     
-    .stSuccess {
-        background-color: #1e293b;
+    .stSuccess {{
+        background-color: {colors["success_bg"]};
         border-left: 3px solid #0d7377;
         border-radius: 6px;
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    }
+        color: {colors["text_primary"]};
+    }}
     
-    .stWarning {
-        background-color: #1e293b;
+    .stWarning {{
+        background-color: {colors["warning_bg"]};
         border-left: 3px solid #f59e0b;
         border-radius: 6px;
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    }
+        color: {colors["text_primary"]};
+    }}
     
-    .stError {
-        background-color: #1e293b;
+    .stError {{
+        background-color: {colors["error_bg"]};
         border-left: 3px solid #d93025;
         border-radius: 6px;
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    }
+        color: {colors["text_primary"]};
+    }}
     
     /* Dataframes */
-    .dataframe {
-        background-color: #1e293b;
-        color: #e0e0e0;
-    }
+    .dataframe {{
+        background-color: {colors["dataframe_bg"]};
+        color: {colors["dataframe_text"]};
+    }}
     
     /* Radio buttons */
-    .stRadio > div {
-        background-color: #1e293b;
+    .stRadio > div {{
+        background-color: {colors["radio_bg"]};
         padding: 1rem;
         border-radius: 8px;
-        border: 1px solid #334155;
-    }
+        border: 1px solid {colors["radio_border"]};
+    }}
     
     /* File uploader - professional styling */
-    [data-testid="stFileUploader"] {
-        background-color: #1e293b;
+    [data-testid="stFileUploader"] {{
+        background-color: {colors["uploader_bg"]};
         border-radius: 6px;
         padding: 1rem;
-        border: 2px dashed #3d4043;
+        border: 2px dashed {colors["uploader_border"]};
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    }
+    }}
     
     /* Progress bar */
-    .stProgress > div > div > div {
-        background-color: #3b82f6;
-    }
+    .stProgress > div > div > div {{
+        background-color: {colors["accent_light"]};
+    }}
     
     /* Main content area */
-    .main .block-container {
+    .main .block-container {{
         padding-top: 2rem;
         padding-bottom: 2rem;
-    }
+    }}
     
     /* Custom card styling */
-    .enterprise-card {
-        background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
-        border: 1px solid #334155;
+    .enterprise-card {{
+        background: {colors["card_bg"]};
+        border: 1px solid {colors["card_border"]};
         border-radius: 12px;
         padding: 1.5rem;
         margin: 1rem 0;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
-    }
+        box-shadow: {'0 4px 6px rgba(0, 0, 0, 0.3)' if theme == 'dark' else '0 2px 4px rgba(0, 0, 0, 0.1)'};
+    }}
     
     /* Score badges */
-    .score-high {
-        color: #10b981;
+    .score-high {{
+        color: {colors["score_high"]};
         font-weight: 700;
         font-size: 1.2rem;
-    }
+    }}
     
-    .score-medium {
-        color: #f59e0b;
+    .score-medium {{
+        color: {colors["score_medium"]};
         font-weight: 700;
         font-size: 1.2rem;
-    }
+    }}
     
-    .score-low {
-        color: #ef4444;
+    .score-low {{
+        color: {colors["score_low"]};
         font-weight: 700;
         font-size: 1.2rem;
-    }
+    }}
     
     /* Multiselect - professional styling to match theme */
-    .stMultiSelect > div > div {
-        background-color: #1e293b;
-        border: 1px solid #3d4043;
+    .stMultiSelect > div > div {{
+        background-color: {colors["multiselect_bg"]} !important;
+        border: 1px solid {colors["multiselect_border"]} !important;
         border-radius: 6px;
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    }
+    }}
     
-    /* Selected items (tags/chips) - blue theme instead of red */
-    .stMultiSelect [data-baseweb="tag"] {
-        background-color: #0a66c2 !important;
+    /* Multiselect dropdown arrow - theme-aware */
+    .stMultiSelect svg,
+    .stMultiSelect [data-baseweb="select"] svg {{
+        fill: {colors["icon_color"]} !important;
+        color: {colors["icon_color"]} !important;
+        opacity: 1 !important;
+    }}
+    
+    /* Multiselect label */
+    .stMultiSelect label {{
+        color: {colors["text_primary"]} !important;
+    }}
+    
+    /* Selected items (tags/chips) - blue theme */
+    .stMultiSelect [data-baseweb="tag"] {{
+        background-color: {colors["accent"]} !important;
         color: white !important;
         border: none !important;
         border-radius: 4px !important;
@@ -275,89 +471,272 @@ ENTERPRISE_CSS = """
         font-size: 0.875rem !important;
         font-weight: 500 !important;
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
-    }
+    }}
     
-    .stMultiSelect [data-baseweb="tag"]:hover {
-        background-color: #004182 !important;
-    }
+    .stMultiSelect [data-baseweb="tag"]:hover {{
+        background-color: {colors["accent_hover"]} !important;
+    }}
     
     /* Remove button (X) in tags */
     .stMultiSelect [data-baseweb="tag"] [role="button"],
-    .stMultiSelect [data-baseweb="tag"] button {
+    .stMultiSelect [data-baseweb="tag"] button {{
         color: white !important;
         opacity: 0.9 !important;
-    }
+    }}
     
     .stMultiSelect [data-baseweb="tag"] [role="button"]:hover,
-    .stMultiSelect [data-baseweb="tag"] button:hover {
+    .stMultiSelect [data-baseweb="tag"] button:hover {{
         opacity: 1 !important;
         background-color: rgba(255, 255, 255, 0.2) !important;
         border-radius: 3px !important;
-    }
+    }}
     
-    /* Alternative selectors for multiselect tags (Streamlit may use different structures) */
+    /* Alternative selectors for multiselect tags */
     .stMultiSelect span[data-testid="stMarkdownContainer"] span,
-    .stMultiSelect div[style*="background"] {
-        background-color: #0a66c2 !important;
+    .stMultiSelect div[style*="background"] {{
+        background-color: {colors["accent"]} !important;
         color: white !important;
-    }
+    }}
     
     /* Target any red/chip-like elements in multiselect */
-    .stMultiSelect > div > div > div > div[style*="rgb"] {
-        background-color: #0a66c2 !important;
+    .stMultiSelect > div > div > div > div[style*="rgb"] {{
+        background-color: {colors["accent"]} !important;
         color: white !important;
-    }
+    }}
     
     /* Multiselect dropdown */
-    .stMultiSelect [data-baseweb="select"] {
-        background-color: #1e293b !important;
-        color: #e8eaed !important;
-        border: 1px solid #3d4043 !important;
+    .stMultiSelect [data-baseweb="select"] {{
+        background-color: {colors["multiselect_bg"]} !important;
+        color: {colors["multiselect_text"]} !important;
+        border: 1px solid {colors["multiselect_border"]} !important;
         border-radius: 6px !important;
-    }
+    }}
     
     /* Multiselect input */
-    .stMultiSelect input {
-        background-color: #1e293b !important;
-        color: #e8eaed !important;
+    .stMultiSelect input {{
+        background-color: {colors["multiselect_bg"]} !important;
+        color: {colors["multiselect_text"]} !important;
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
-    }
+    }}
     
     /* Override any red colors in multiselect */
-    .stMultiSelect * {
-        --primary-color: #0a66c2 !important;
-    }
+    .stMultiSelect * {{
+        --primary-color: {colors["accent"]} !important;
+    }}
     
     /* Style for selected option chips/tags - comprehensive override */
     div[data-baseweb="select"] [data-baseweb="tag"],
     div[data-baseweb="select"] span[style*="background-color: rgb"],
-    .stMultiSelect div[style*="background-color: rgb(255"] {
-        background-color: #0a66c2 !important;
+    .stMultiSelect div[style*="background-color: rgb(255"] {{
+        background-color: {colors["accent"]} !important;
         color: white !important;
-        border-color: #0a66c2 !important;
-    }
+        border-color: {colors["accent"]} !important;
+    }}
+    
+    /* ============================================
+       DROPDOWN OPTIONS MENU (CRITICAL FOR LIGHT MODE)
+       ============================================ */
+    
+    /* Selectbox dropdown menu/popover */
+    div[data-baseweb="popover"] {{
+        background-color: {colors["input_bg"]} !important;
+        border: 1px solid {colors["input_border"]} !important;
+        border-radius: 6px !important;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1) !important;
+    }}
+    
+    /* Dropdown option items */
+    div[data-baseweb="popover"] ul,
+    div[data-baseweb="popover"] li,
+    div[data-baseweb="popover"] [role="option"] {{
+        background-color: {colors["input_bg"]} !important;
+        color: {colors["input_text"]} !important;
+    }}
+    
+    /* Dropdown option hover state */
+    div[data-baseweb="popover"] [role="option"]:hover,
+    div[data-baseweb="popover"] li:hover {{
+        background-color: {colors["surface"]} !important;
+        color: {colors["text_primary"]} !important;
+    }}
+    
+    /* Dropdown option selected state */
+    div[data-baseweb="popover"] [role="option"][aria-selected="true"],
+    div[data-baseweb="popover"] li[aria-selected="true"] {{
+        background-color: {colors["accent"]} !important;
+        color: white !important;
+    }}
+    
+    /* Multiselect dropdown menu */
+    .stMultiSelect div[data-baseweb="popover"],
+    .stMultiSelect div[data-baseweb="popover"] ul,
+    .stMultiSelect div[data-baseweb="popover"] li {{
+        background-color: {colors["input_bg"]} !important;
+        color: {colors["input_text"]} !important;
+        border: 1px solid {colors["input_border"]} !important;
+    }}
+    
+    /* Multiselect option hover */
+    .stMultiSelect div[data-baseweb="popover"] [role="option"]:hover {{
+        background-color: {colors["surface"]} !important;
+        color: {colors["text_primary"]} !important;
+    }}
+    
+    /* Multiselect option selected/checked */
+    .stMultiSelect div[data-baseweb="popover"] [role="option"][aria-selected="true"] {{
+        background-color: {colors["accent"]} !important;
+        color: white !important;
+    }}
+    
+    /* ============================================
+       SIDEBAR ICONS AND ARROWS
+       ============================================ */
+    
+    /* Sidebar icons */
+    [data-testid="stSidebar"] svg,
+    [data-testid="stSidebar"] [class*="icon"],
+    [data-testid="stSidebar"] [class*="arrow"] {{
+        fill: {colors["icon_color"]} !important;
+        color: {colors["icon_color"]} !important;
+        opacity: 1 !important;
+    }}
+    
+    /* Sidebar text */
+    [data-testid="stSidebar"] p,
+    [data-testid="stSidebar"] div,
+    [data-testid="stSidebar"] span,
+    [data-testid="stSidebar"] label {{
+        color: {colors["text_primary"]} !important;
+    }}
+    
+    /* Sidebar expander content */
+    [data-testid="stSidebar"] .streamlit-expanderContent {{
+        background-color: {colors["expander_content_bg"]} !important;
+        color: {colors["text_primary"]} !important;
+    }}
+    
+    /* ============================================
+       ADDITIONAL FIXES
+       ============================================ */
+    
+    /* Radio button labels */
+    .stRadio label {{
+        color: {colors["text_primary"]} !important;
+    }}
+    
+    /* Number input */
+    .stNumberInput > div > div > input {{
+        background-color: {colors["input_bg"]} !important;
+        color: {colors["input_text"]} !important;
+        border: 1px solid {colors["input_border"]} !important;
+    }}
+    
+    /* File uploader text */
+    [data-testid="stFileUploader"] label,
+    [data-testid="stFileUploader"] p {{
+        color: {colors["text_primary"]} !important;
+    }}
+    
+    /* ============================================
+       TOOLTIP STYLING (GLOBAL FIX)
+       ============================================ */
+    
+    /* BaseWeb tooltip container - comprehensive selectors */
+    div[data-baseweb="tooltip"],
+    [data-baseweb="tooltip"],
+    [data-baseweb="popover"][role="tooltip"],
+    div[role="tooltip"],
+    [role="tooltip"] {{
+        background-color: {colors["surface"]} !important;
+        color: {colors["text_primary"]} !important;
+        border: 1px solid {colors["border"]} !important;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2) !important;
+    }}
+    
+    /* Tooltip text content - all nested elements */
+    div[data-baseweb="tooltip"] *,
+    [data-baseweb="tooltip"] *,
+    [data-baseweb="popover"][role="tooltip"] *,
+    div[role="tooltip"] *,
+    [role="tooltip"] *,
+    div[data-baseweb="tooltip"] span,
+    [data-baseweb="tooltip"] span,
+    [data-baseweb="popover"][role="tooltip"] span,
+    div[role="tooltip"] span,
+    [role="tooltip"] span,
+    div[data-baseweb="tooltip"] p,
+    [data-baseweb="tooltip"] p,
+    [data-baseweb="popover"][role="tooltip"] p,
+    div[role="tooltip"] p,
+    [role="tooltip"] p {{
+        color: {colors["text_primary"]} !important;
+        background-color: transparent !important;
+    }}
+    
+    /* Streamlit-specific tooltip selectors */
+    [data-testid="stTooltip"],
+    [data-testid="stTooltip"] *,
+    [data-testid="stTooltip"] span,
+    [data-testid="stTooltip"] p {{
+        color: {colors["text_primary"]} !important;
+        background-color: {colors["surface"]} !important;
+    }}
+    
+    /* Tooltip arrow/pointer styling */
+    div[data-baseweb="tooltip"]::before,
+    [data-baseweb="tooltip"]::before,
+    [data-baseweb="popover"][role="tooltip"]::before,
+    div[role="tooltip"]::before,
+    [role="tooltip"]::before {{
+        border-color: {colors["border"]} transparent transparent transparent !important;
+    }}
+    
+    /* Alternative tooltip selectors for BaseWeb classes */
+    [class*="tooltip"],
+    [class*="Tooltip"],
+    [class*="Popover"][role="tooltip"] {{
+        background-color: {colors["surface"]} !important;
+        color: {colors["text_primary"]} !important;
+    }}
+    
+    [class*="tooltip"] *,
+    [class*="Tooltip"] *,
+    [class*="Popover"][role="tooltip"] * {{
+        color: {colors["text_primary"]} !important;
+    }}
+    
+    /* Ensure tooltip has high z-index and is visible */
+    div[data-baseweb="tooltip"],
+    [data-baseweb="tooltip"],
+    [role="tooltip"] {{
+        z-index: 9999 !important;
+        opacity: 1 !important;
+    }}
     
     /* Success toast animation - professional and subtle */
-    .stSuccess {
+    .stSuccess {{
         animation: slideInDown 0.3s ease-out;
         position: relative;
         z-index: 999;
-    }
+    }}
     
-    @keyframes slideInDown {
-        from {
+    @keyframes slideInDown {{
+        from {{
             transform: translateY(-20px);
             opacity: 0;
-        }
-        to {
+        }}
+        to {{
             transform: translateY(0);
             opacity: 1;
-        }
-    }
+        }}
+    }}
 </style>
 """
 
-st.markdown(ENTERPRISE_CSS, unsafe_allow_html=True)
+
+# Apply theme-based CSS (re-inject on theme change)
+current_css = get_theme_css(st.session_state.theme)
+st.markdown(current_css, unsafe_allow_html=True)
 
 # API configuration (hardcoded, not exposed to users)
 API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000")
@@ -448,16 +827,15 @@ def initialize_session():
         st.session_state.generated_jd = ""
     if "top_k_display" not in st.session_state:
         st.session_state.top_k_display = 3  # Default to Top 3
+    if "theme" not in st.session_state:
+        st.session_state.theme = "dark"  # Default theme
 
 
 def display_header():
     """Display enterprise header with institute and company branding"""
     # Logo paths
     siei_logo_path = "assets/siei_logo.png"
-    ey_logo_path = "assets/ey_logo.png"  # Primary path
-    ey_logo_path_alt = "assets/ey_logo.png"  # Alternative path
     SIEI_LOGO = Path(siei_logo_path)
-    EY_LOGO = Path(ey_logo_path)
     
     # Top header bar with left and right branding (ABOVE main title)
     col_left, col_center, col_right = st.columns([3, 4, 3])
@@ -503,22 +881,28 @@ def display_header():
                             logo_found = True
                             break
                     if not logo_found:
-                        st.markdown('<div style="height:52px;width:52px;background:#1e293b;border-radius:4px;display:flex;align-items:center;justify-content:center;color:#0a66c2;font-size:10px;font-weight:bold;">SIEI</div>', unsafe_allow_html=True)
+                        theme_colors = get_theme()
+                        input_bg = theme_colors["input_bg"]
+                        accent = theme_colors["accent"]
+                        st.markdown(f'<div style="height:52px;width:52px;background:{input_bg};border-radius:4px;display:flex;align-items:center;justify-content:center;color:{accent};font-size:10px;font-weight:bold;">SIEI</div>', unsafe_allow_html=True)
         with logo_text_col2:
-            st.markdown("""
+            theme_colors = get_theme()
+            accent = theme_colors["accent"]
+            text_muted = theme_colors["text_muted"]
+            st.markdown(f"""
         <div style="
             font-size: 1.1rem;
             font-weight: 600;
-            color: #0a66c2;
+            color: {accent};
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
             line-height: 1.1;
             margin-top: 6px;
-            margin-left: -16px;  /* ⬅️ pulls text closer to logo */
+            margin-left: -16px;
         ">SIEI</div>
 
         <div style="
             font-size: 0.75rem;
-            color: #9aa0a6;
+            color: {text_muted};
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
             margin-top: 2px;
             white-space: nowrap;
@@ -527,10 +911,11 @@ def display_header():
     """, unsafe_allow_html=True)
     
     with col_right:
-        # Right: EY Branding - Logo image using Base64 + HTML
+        # Right: EY Branding - Logo image using Base64 + HTML (theme-aware)
+        ey_logo_path = get_ey_logo_path()
         
-        if EY_LOGO.exists():
-            ey_base64 = img_to_base64(EY_LOGO)
+        if ey_logo_path and os.path.exists(ey_logo_path):
+            ey_base64 = img_to_base64(ey_logo_path)
             st.markdown(
                 f"""
                 <div style="
@@ -553,45 +938,20 @@ def display_header():
                 """,
                 unsafe_allow_html=True
             )
-
-        elif os.path.exists(ey_logo_path_alt):
-            # Try alternative .png extension
-            EY_LOGO_ALT = Path(ey_logo_path_alt)
-            if EY_LOGO_ALT.exists():
-                ey_base64 = img_to_base64(EY_LOGO_ALT)
-                st.markdown(
-                    f"""
-                    <div style="
-                        display:flex;
-                        justify-content:flex-end;
-                        align-items:flex-start;
-                        margin-top:16px;
-                        margin-right:-32px;
-                    ">
-                        <img src="data:image/png;base64,{ey_base64}"
-                             style="
-                                width:64px;
-                                height:auto;
-                                display:block;
-                                pointer-events:none;
-                                user-select:none;  
-                            "
-                        />
-                    </div>
-                    """,
-                    unsafe_allow_html=True     
-                )  
         else:
-            # ❌ Do nothing if logo not found (NO BOX)
+            # Do nothing if logo not found (NO BOX)
             st.markdown("")
     
     # Main title at center - moved slightly upward
-    st.markdown("""
+    theme_colors = get_theme()
+    text_primary = theme_colors["text_primary"]
+    text_secondary = theme_colors["text_secondary"]
+    st.markdown(f"""
         <div style="text-align: center; padding: 1rem 0 1.5rem 0;">
-            <h1 style="color: #0a66c2; font-size: 2.5rem; margin-bottom: 0.5rem; font-weight: 600; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; letter-spacing: -0.02em;">
+            <h1 style="color: {text_primary}; font-size: 2.5rem; margin-bottom: 0.5rem; font-weight: 600; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; letter-spacing: -0.02em;">
                 HR AI Agent
             </h1>
-            <p style="color: #9aa0a6; font-size: 1.1rem; margin-top: 0; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
+            <p style="color: {text_secondary}; font-size: 1.1rem; margin-top: 0; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
                 Enterprise Talent Intelligence Platform
             </p>
         </div>
@@ -980,6 +1340,21 @@ def main():
     
     # Sidebar - HR-friendly content only (collapsible)
     with st.sidebar:
+        # Theme toggle (top of sidebar)
+        theme_col1, theme_col2 = st.columns([1, 3])
+        with theme_col1:
+            theme_icon = "☀️" if st.session_state.theme == "dark" else "🌙"
+            theme_label = "Light" if st.session_state.theme == "dark" else "Dark"
+            if st.button(theme_icon, key="theme_toggle", help=f"Switch to {theme_label} mode", use_container_width=True):
+                st.session_state.theme = "light" if st.session_state.theme == "dark" else "dark"
+                st.rerun()
+        with theme_col2:
+            theme = get_theme()
+            text_secondary = theme["text_secondary"]
+            st.markdown(f"<div style='margin-top:8px; color: {text_secondary}; font-size: 0.85rem;'>{theme_label} Mode</div>", unsafe_allow_html=True)
+        
+        st.markdown("---")
+        
         # Collapsible "How to Use" section
         with st.expander("📋 How to Use", expanded=False):
             st.markdown("""
