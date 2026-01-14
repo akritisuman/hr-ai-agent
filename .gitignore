@@ -1,0 +1,16 @@
+# Virtual environment
+myenv/
+venv/
+.env
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Streamlit temp
+temp_sessions/
+.streamlit/
+
+# OS / Editor
+.DS_Store
+.vscode/
