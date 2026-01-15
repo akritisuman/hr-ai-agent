@@ -248,8 +248,8 @@ Edit `agent.py` to change the AI model:
 
 ```python
 self.llm = ChatOpenAI(
-    model_name="gpt-4-turbo-preview",  # Change this
-    temperature=0.3
+    model_name="gpt-4.1",  # Change this
+    temperature=0
 )
 ```
 
