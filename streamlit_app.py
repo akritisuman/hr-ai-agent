@@ -21,7 +21,7 @@ def img_to_base64(path):
 
 def get_ey_logo_path() -> Optional[str]:
     """
-    Get the appropriate EY logo path based on current theme
+    Get the EY logo path based on current theme
     
     Returns:
         Path to EY logo file, or None if no logo is available
@@ -32,19 +32,14 @@ def get_ey_logo_path() -> Optional[str]:
         dark_logo = "assets/ey_logo_dark.png"
         if os.path.exists(dark_logo):
             return dark_logo
-        # Fallback to generic logo if dark-specific doesn't exist
-        generic_logo = "assets/ey_logo.png"
-        if os.path.exists(generic_logo):
-            return generic_logo
-    else:  # light mode
+    else:
         light_logo = "assets/ey_logo_light.png"
         if os.path.exists(light_logo):
             return light_logo
-        # Fallback to generic logo if light-specific doesn't exist
-        generic_logo = "assets/ey_logo.png"
-        if os.path.exists(generic_logo):
-            return generic_logo
     
+    generic_logo = "assets/ey_logo.png"
+    if os.path.exists(generic_logo):
+        return generic_logo
     return None
 
 
@@ -101,53 +96,62 @@ THEME_CONFIG = {
         "icon_color": "#9aa0a6",
         "surface": "#1e293b",
         "background": "#0f1419",
+        "button_disabled_bg": "#3d4043",
+        "button_disabled_text": "#9aa0a6",
+        "tooltip_bg": "#1e293b",
+        "tooltip_text": "#e8eaed",
     },
     "light": {
-        "app_bg": "linear-gradient(135deg, #f5f7fa 0%, #ffffff 50%, #f5f7fa 100%)",
-        "sidebar_bg": "linear-gradient(180deg, #ffffff 0%, #f5f7fa 100%)",
-        "text_primary": "#1d1d1f",
-        "text_secondary": "#4a5568",
-        "text_muted": "#6b7280",
-        "input_bg": "#ffffff",
-        "input_border": "#d1d5db",
-        "input_text": "#1d1d1f",
-        "card_bg": "linear-gradient(135deg, #ffffff 0%, #f9fafb 100%)",
-        "card_border": "#e5e7eb",
-        "expander_header_bg": "#ffffff",
-        "expander_content_bg": "#f9fafb",
-        "info_bg": "#eff6ff",
-        "success_bg": "#f0fdf4",
-        "warning_bg": "#fffbeb",
-        "error_bg": "#fef2f2",
-        "dataframe_bg": "#ffffff",
-        "dataframe_text": "#1d1d1f",
-        "radio_bg": "#ffffff",
-        "radio_border": "#e5e7eb",
-        "uploader_bg": "#ffffff",
-        "uploader_border": "#d1d5db",
-        "multiselect_bg": "#ffffff",
-        "multiselect_border": "#d1d5db",
-        "multiselect_text": "#1d1d1f",
-        "accent": "#0a66c2",
-        "accent_hover": "#004182",
+        "app_bg": "#FFFFFF",
+        "sidebar_bg": "#FFFFFF",
+        "text_primary": "#111827",
+        "text_secondary": "#4B5563",
+        "text_muted": "#6B7280",
+        "input_bg": "#FFFFFF",
+        "input_border": "#D1D5DB",
+        "input_text": "#111827",
+        "card_bg": "#FFFFFF",
+        "card_border": "#D1D5DB",
+        "expander_header_bg": "#FFFFFF",
+        "expander_content_bg": "#FFFFFF",
+        "info_bg": "#FFFFFF",
+        "success_bg": "#FFFFFF",
+        "warning_bg": "#FFFFFF",
+        "error_bg": "#FFFFFF",
+        "dataframe_bg": "#FFFFFF",
+        "dataframe_text": "#111827",
+        "radio_bg": "#FFFFFF",
+        "radio_border": "#D1D5DB",
+        "uploader_bg": "#FFFFFF",
+        "uploader_border": "#D1D5DB",
+        "multiselect_bg": "#FFFFFF",
+        "multiselect_border": "#D1D5DB",
+        "multiselect_text": "#111827",
+        "accent": "#2563EB",
+        "accent_hover": "#1d4ed8",
         "accent_light": "#3b82f6",
         "score_high": "#10b981",
         "score_medium": "#f59e0b",
         "score_low": "#ef4444",
-        "border": "#d1d5db",
-        "icon_color": "#4a5568",
-        "surface": "#ffffff",
-        "background": "#f5f7fa",
+        "border": "#D1D5DB",
+        "icon_color": "#4B5563",
+        "surface": "#F9FAFB",
+        "background": "#FFFFFF",
+        "button_disabled_bg": "#E5E7EB",
+        "button_disabled_text": "#6B7280",
+        "tooltip_bg": "#111827",
+        "tooltip_text": "#FFFFFF",
     }
 }
 
 def get_theme() -> dict:
     """Get current theme configuration"""
-    return THEME_CONFIG.get(st.session_state.theme, THEME_CONFIG["dark"])
+    theme = st.session_state.get("theme", "dark")
+    return THEME_CONFIG.get(theme, THEME_CONFIG["dark"])
 
 def get_theme_css(theme: str) -> str:
     """
-    Get CSS based on selected theme (dark or light)
+    Get CSS based on selected theme
     Uses centralized THEME_CONFIG for consistent colors
     
     Args:
@@ -157,6 +161,378 @@ def get_theme_css(theme: str) -> str:
         CSS string for the selected theme
     """
     colors = THEME_CONFIG.get(theme, THEME_CONFIG["dark"])
+    
+    # Light-mode-only global fix for white boxes inside colored containers
+    light_mode_global_fix = ""
+    if theme == "light":
+        light_mode_global_fix = f"""
+    /* ============================================
+       GLOBAL FIX: Remove white boxes inside colored containers (Light Mode Only)
+       Rule-based approach: All informational containers get flat styling
+       ============================================ */
+    
+    /* Target ALL informational/message containers - comprehensive list */
+    .stInfo,
+    .stSuccess,
+    .stWarning,
+    .stError,
+    [data-testid="stMarkdownContainer"],
+    [data-testid="stVerticalBlock"],
+    [data-testid="stHorizontalBlock"],
+    [class*="result"],
+    [class*="candidate"],
+    [class*="ranking"],
+    [class*="summary"],
+    [class*="skill"],
+    [class*="matched"],
+    [class*="missing"],
+    [class*="metric"],
+    [class*="score"],
+    .enterprise-card,
+    .streamlit-expanderHeader,
+    .streamlit-expanderContent {{
+        /* Container itself keeps its background - no change */
+    }}
+    
+    /* ALL nested elements in informational containers - FORCE transparent */
+    .stInfo *,
+    .stInfo > *,
+    .stInfo div,
+    .stInfo span,
+    .stInfo p,
+    .stInfo label,
+    .stSuccess *,
+    .stSuccess > *,
+    .stSuccess div,
+    .stSuccess span,
+    .stSuccess p,
+    .stSuccess label,
+    .stWarning *,
+    .stWarning > *,
+    .stWarning div,
+    .stWarning span,
+    .stWarning p,
+    .stWarning label,
+    .stError *,
+    .stError > *,
+    .stError div,
+    .stError span,
+    .stError p,
+    .stError label,
+    [data-testid="stMarkdownContainer"] *,
+    [data-testid="stMarkdownContainer"] > *,
+    [data-testid="stMarkdownContainer"] div,
+    [data-testid="stMarkdownContainer"] span,
+    [data-testid="stMarkdownContainer"] p,
+    [data-testid="stVerticalBlock"] *,
+    [data-testid="stHorizontalBlock"] *,
+    [class*="result"] *,
+    [class*="candidate"] *,
+    [class*="ranking"] *,
+    [class*="summary"] *,
+    [class*="skill"] *,
+    [class*="matched"] *,
+    [class*="missing"] *,
+    .enterprise-card *,
+    .enterprise-card > *,
+    .enterprise-card div,
+    .enterprise-card span,
+    .enterprise-card p,
+    .enterprise-card label,
+    .streamlit-expanderHeader *,
+    .streamlit-expanderHeader > *,
+    .streamlit-expanderHeader div,
+    .streamlit-expanderHeader span,
+    .streamlit-expanderHeader p,
+    .streamlit-expanderHeader label,
+    .streamlit-expanderContent *,
+    .streamlit-expanderContent > *,
+    .streamlit-expanderContent div,
+    .streamlit-expanderContent span,
+    .streamlit-expanderContent p,
+    .streamlit-expanderContent label {{
+        background-color: transparent !important;
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        -webkit-box-shadow: none !important;
+    }}
+    
+    /* EXCLUDE: JD Type radio selector - must keep active background for selected state */
+    .stRadio [role="radiogroup"][aria-orientation="horizontal"],
+    .stRadio [role="radiogroup"][aria-orientation="horizontal"] *,
+    .stRadio [role="radiogroup"][aria-orientation="horizontal"] > *,
+    .stRadio [role="radiogroup"][aria-orientation="horizontal"] div,
+    .stRadio [role="radiogroup"][aria-orientation="horizontal"] span,
+    .stRadio [role="radiogroup"][aria-orientation="horizontal"] label,
+    .stRadio [role="radiogroup"][aria-orientation="horizontal"] input[type="radio"],
+    .stRadio [role="radiogroup"][aria-orientation="horizontal"] input[type="radio"]:checked + label {{
+        background-color: revert !important;
+        background: revert !important;
+        border: revert !important;
+        box-shadow: revert !important;
+        -webkit-box-shadow: revert !important;
+    }}
+    
+    /* EXCLUDE: Streamlit input components - they MUST keep their input styling */
+    .stInfo .stTextInput,
+    .stInfo .stTextInput *,
+    .stInfo .stTextArea,
+    .stInfo .stTextArea *,
+    .stInfo .stSelectbox,
+    .stInfo .stSelectbox *,
+    .stInfo .stMultiSelect,
+    .stInfo .stMultiSelect *,
+    .stInfo .stNumberInput,
+    .stInfo .stNumberInput *,
+    .stInfo [data-testid="stFileUploader"],
+    .stInfo [data-testid="stFileUploader"] *,
+    .stSuccess .stTextInput,
+    .stSuccess .stTextInput *,
+    .stSuccess .stTextArea,
+    .stSuccess .stTextArea *,
+    .stSuccess .stSelectbox,
+    .stSuccess .stSelectbox *,
+    .stSuccess .stMultiSelect,
+    .stSuccess .stMultiSelect *,
+    .stSuccess .stNumberInput,
+    .stSuccess .stNumberInput *,
+    .stSuccess [data-testid="stFileUploader"],
+    .stSuccess [data-testid="stFileUploader"] *,
+    .stWarning .stTextInput,
+    .stWarning .stTextInput *,
+    .stWarning .stTextArea,
+    .stWarning .stTextArea *,
+    .stWarning .stSelectbox,
+    .stWarning .stSelectbox *,
+    .stWarning .stMultiSelect,
+    .stWarning .stMultiSelect *,
+    .stWarning .stNumberInput,
+    .stWarning .stNumberInput *,
+    .stWarning [data-testid="stFileUploader"],
+    .stWarning [data-testid="stFileUploader"] *,
+    .stError .stTextInput,
+    .stError .stTextInput *,
+    .stError .stTextArea,
+    .stError .stTextArea *,
+    .stError .stSelectbox,
+    .stError .stSelectbox *,
+    .stError .stMultiSelect,
+    .stError .stMultiSelect *,
+    .stError .stNumberInput,
+    .stError .stNumberInput *,
+    .stError [data-testid="stFileUploader"],
+    .stError [data-testid="stFileUploader"] *,
+    [data-testid="stMarkdownContainer"] .stTextInput,
+    [data-testid="stMarkdownContainer"] .stTextInput *,
+    [data-testid="stMarkdownContainer"] .stTextArea,
+    [data-testid="stMarkdownContainer"] .stTextArea *,
+    [data-testid="stMarkdownContainer"] .stSelectbox,
+    [data-testid="stMarkdownContainer"] .stSelectbox *,
+    [data-testid="stMarkdownContainer"] .stMultiSelect,
+    [data-testid="stMarkdownContainer"] .stMultiSelect *,
+    [data-testid="stMarkdownContainer"] .stNumberInput,
+    [data-testid="stMarkdownContainer"] .stNumberInput *,
+    [data-testid="stMarkdownContainer"] [data-testid="stFileUploader"],
+    [data-testid="stMarkdownContainer"] [data-testid="stFileUploader"] *,
+    .enterprise-card .stTextInput,
+    .enterprise-card .stTextInput *,
+    .enterprise-card .stTextArea,
+    .enterprise-card .stTextArea *,
+    .enterprise-card .stSelectbox,
+    .enterprise-card .stSelectbox *,
+    .enterprise-card .stMultiSelect,
+    .enterprise-card .stMultiSelect *,
+    .enterprise-card .stNumberInput,
+    .enterprise-card .stNumberInput *,
+    .enterprise-card [data-testid="stFileUploader"],
+    .enterprise-card [data-testid="stFileUploader"] *,
+    .streamlit-expanderContent .stTextInput,
+    .streamlit-expanderContent .stTextInput *,
+    .streamlit-expanderContent .stTextArea,
+    .streamlit-expanderContent .stTextArea *,
+    .streamlit-expanderContent .stSelectbox,
+    .streamlit-expanderContent .stSelectbox *,
+    .streamlit-expanderContent .stMultiSelect,
+    .streamlit-expanderContent .stMultiSelect *,
+    .streamlit-expanderContent .stNumberInput,
+    .streamlit-expanderContent .stNumberInput *,
+    .streamlit-expanderContent [data-testid="stFileUploader"],
+    .streamlit-expanderContent [data-testid="stFileUploader"] * {{
+        background-color: {colors["input_bg"]} !important;
+        border: 1px solid {colors["input_border"]} !important;
+    }}
+    
+    /* EXCLUDE: Buttons - they have their own styling */
+    .stInfo [data-testid="stButton"] > button,
+    .stSuccess [data-testid="stButton"] > button,
+    .stWarning [data-testid="stButton"] > button,
+    .stError [data-testid="stButton"] > button,
+    [data-testid="stMarkdownContainer"] [data-testid="stButton"] > button,
+    [class*="result"] [data-testid="stButton"] > button,
+    .enterprise-card [data-testid="stButton"] > button,
+    .streamlit-expanderContent [data-testid="stButton"] > button,
+    .stInfo [data-testid="stDownloadButton"] > button,
+    .stSuccess [data-testid="stDownloadButton"] > button,
+    .stWarning [data-testid="stDownloadButton"] > button,
+    .stError [data-testid="stDownloadButton"] > button,
+    [data-testid="stMarkdownContainer"] [data-testid="stDownloadButton"] > button,
+    [class*="result"] [data-testid="stDownloadButton"] > button,
+    .enterprise-card [data-testid="stDownloadButton"] > button,
+    .streamlit-expanderContent [data-testid="stDownloadButton"] > button {{
+        background-color: {colors["accent"]} !important;
+    }}
+    
+    /* Dark backgrounds - white text for readability */
+    [style*="background"][style*="#0f"],
+    [style*="background"][style*="#1a"],
+    [style*="background"][style*="#1e"],
+    [style*="background-color"][style*="#0f"],
+    [style*="background-color"][style*="#1a"],
+    [style*="background-color"][style*="#1e"],
+    [style*="background: #0f"],
+    [style*="background: #1a"],
+    [style*="background: #1e"],
+    [style*="background-color: #0f"],
+    [style*="background-color: #1a"],
+    [style*="background-color: #1e"] {{
+        color: white !important;
+    }}
+    
+    [style*="background"][style*="#0f"] *,
+    [style*="background"][style*="#1a"] *,
+    [style*="background"][style*="#1e"] *,
+    [style*="background-color"][style*="#0f"] *,
+    [style*="background-color"][style*="#1a"] *,
+    [style*="background-color"][style*="#1e"] *,
+    [style*="background: #0f"] *,
+    [style*="background: #1a"] *,
+    [style*="background: #1e"] *,
+    [style*="background-color: #0f"] *,
+    [style*="background-color: #1a"] *,
+    [style*="background-color: #1e"] * {{
+        color: white !important;
+        background-color: transparent !important;
+    }}
+    """
+    
+    # Light-mode-only fixes for dark sections with invisible text
+    light_mode_dark_section_fixes = ""
+    if theme == "light":
+        light_mode_dark_section_fixes = f"""
+    /* ============================================
+       LIGHT MODE: Fix text visibility in dark sections
+       (ONLY text color, NO background changes)
+       ============================================ */
+    
+    /* Dark/black result cards and sections - white text only */
+    [style*="background"][style*="#0f"],
+    [style*="background"][style*="#1a"],
+    [style*="background"][style*="#1e"],
+    [style*="background"][style*="rgb(15"],
+    [style*="background"][style*="rgb(26"],
+    [style*="background"][style*="rgb(30"],
+    [style*="background-color"][style*="#0f"],
+    [style*="background-color"][style*="#1a"],
+    [style*="background-color"][style*="#1e"],
+    [style*="background-color"][style*="rgb(15"],
+    [style*="background-color"][style*="rgb(26"],
+    [style*="background-color"][style*="rgb(30"],
+    [style*="background: #0f"],
+    [style*="background: #1a"],
+    [style*="background: #1e"],
+    [style*="background-color: #0f"],
+    [style*="background-color: #1a"],
+    [style*="background-color: #1e"] {{
+        color: white !important;
+    }}
+    
+    [style*="background"][style*="#0f"] *,
+    [style*="background"][style*="#1a"] *,
+    [style*="background"][style*="#1e"] *,
+    [style*="background-color"][style*="#0f"] *,
+    [style*="background-color"][style*="#1a"] *,
+    [style*="background-color"][style*="#1e"] * {{
+        color: white !important;
+    }}
+    
+    /* Expandable candidate sections with dark backgrounds */
+    .streamlit-expanderHeader[style*="background"][style*="#0f"],
+    .streamlit-expanderHeader[style*="background"][style*="#1a"],
+    .streamlit-expanderHeader[style*="background"][style*="#1e"],
+    .streamlit-expanderContent[style*="background"][style*="#0f"],
+    .streamlit-expanderContent[style*="background"][style*="#1a"],
+    .streamlit-expanderContent[style*="background"][style*="#1e"] {{
+        color: white !important;
+    }}
+    
+    .streamlit-expanderHeader[style*="background"][style*="#0f"] *,
+    .streamlit-expanderHeader[style*="background"][style*="#1a"] *,
+    .streamlit-expanderHeader[style*="background"][style*="#1e"] *,
+    .streamlit-expanderContent[style*="background"][style*="#0f"] *,
+    .streamlit-expanderContent[style*="background"][style*="#1a"] *,
+    .streamlit-expanderContent[style*="background"][style*="#1e"] * {{
+        color: white !important;
+    }}
+    
+    /* Score containers with dark backgrounds */
+    [class*="score"][style*="background"][style*="#0f"],
+    [class*="score"][style*="background"][style*="#1a"],
+    [class*="score"][style*="background"][style*="#1e"],
+    p[class*="score"][style*="background"][style*="#0f"],
+    p[class*="score"][style*="background"][style*="#1a"],
+    p[class*="score"][style*="background"][style*="#1e"] {{
+        color: white !important;
+    }}
+    
+    [class*="score"][style*="background"][style*="#0f"] *,
+    [class*="score"][style*="background"][style*="#1a"] *,
+    [class*="score"][style*="background"][style*="#1e"] * {{
+        color: white !important;
+    }}
+    
+    /* Selection sliders and controls with dark backgrounds */
+    .stSlider [style*="background"][style*="#0f"],
+    .stSlider [style*="background"][style*="#1a"],
+    .stSlider [style*="background"][style*="#1e"] {{
+        color: white !important;
+    }}
+    
+    .stSlider [style*="background"][style*="#0f"] *,
+    .stSlider [style*="background"][style*="#1a"] *,
+    .stSlider [style*="background"][style*="#1e"] * {{
+        color: white !important;
+    }}
+    
+    /* Buttons with dark backgrounds - text only */
+    .stButton > button[style*="background"][style*="#0f"],
+    .stButton > button[style*="background"][style*="#1a"],
+    .stButton > button[style*="background"][style*="#1e"],
+    [data-testid="stDownloadButton"] > button[style*="background"][style*="#0f"],
+    [data-testid="stDownloadButton"] > button[style*="background"][style*="#1a"],
+    [data-testid="stDownloadButton"] > button[style*="background"][style*="#1e"] {{
+        color: white !important;
+    }}
+    
+    .stButton > button[style*="background"][style*="#0f"] *,
+    .stButton > button[style*="background"][style*="#1a"] *,
+    .stButton > button[style*="background"][style*="#1e"] * {{
+        color: white !important;
+    }}
+    
+    /* Selected Skills display - no white background, only text fix if needed */
+    [class*="skill"][style*="background"][style*="#0f"],
+    [class*="skill"][style*="background"][style*="#1a"],
+    [class*="skill"][style*="background"][style*="#1e"] {{
+        color: white !important;
+    }}
+    
+    [class*="skill"][style*="background"][style*="#0f"] *,
+    [class*="skill"][style*="background"][style*="#1a"] *,
+    [class*="skill"][style*="background"][style*="#1e"] * {{
+        color: white !important;
+    }}
+    """
     
     return f"""
 <style>
@@ -168,7 +544,120 @@ def get_theme_css(theme: str) -> str:
         background: {colors["app_bg"]};
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     }}
+
+    /* Streamlit top header bar */
+    header[data-testid="stHeader"] {{
+        background-color: {colors["app_bg"]} !important;
+        box-shadow: none !important;
+        border-bottom: 1px solid {colors["border"]} !important;
+    }}
+
+    /* ==================================================
+    BASEWEB SELECT & MULTISELECT
+    ================================================== */
+
+    /* Select / Multiselect main input */
+    div[data-baseweb="select"] {{
+        background-color: {colors["input_bg"]} !important;
+        color: {colors["input_text"]} !important;
+        border: 1px solid {colors["input_border"]} !important;
+    }}
+
+    /* Ensure text inside select is correct */
+    div[data-baseweb="select"] *,
+    div[data-baseweb="select"] > div,
+    div[data-baseweb="select"] > div > div {{
+        color: {colors["input_text"]} !important;
+        background-color: {colors["input_bg"]} !important;
+    }}
+
+    /* Dropdown popup container */
+    div[data-baseweb="popover"],
+    div[data-baseweb="popover"] > div,
+    div[data-baseweb="popover"] [role="listbox"] {{
+        background-color: {colors["input_bg"]} !important;
+        border: 1px solid {colors["input_border"]} !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08) !important;
+    }}
     
+    /* Dropdown container inner elements */
+    div[data-baseweb="popover"] > div *,
+    div[data-baseweb="popover"] [role="listbox"] > * {{
+        background-color: {colors["input_bg"]} !important;
+    }}
+
+    /* Dropdown options */
+    div[data-baseweb="popover"] li,
+    div[data-baseweb="popover"] [role="option"],
+    div[data-baseweb="popover"] ul,
+    div[data-baseweb="popover"] [role="listbox"],
+    div[data-baseweb="popover"] [role="listbox"] li {{
+        background-color: {colors["input_bg"]} !important;
+        color: {colors["input_text"]} !important;
+    }}
+    
+    /* Dropdown option text content - comprehensive override */
+    div[data-baseweb="popover"] li *,
+    div[data-baseweb="popover"] [role="option"] *,
+    div[data-baseweb="popover"] [role="listbox"] *,
+    div[data-baseweb="popover"] [role="listbox"] li *,
+    div[data-baseweb="popover"] li span,
+    div[data-baseweb="popover"] [role="option"] span,
+    div[data-baseweb="popover"] li div,
+    div[data-baseweb="popover"] [role="option"] div {{
+        color: {colors["input_text"]} !important;
+        background-color: transparent !important;
+    }}
+
+    /* Hover state */
+    div[data-baseweb="popover"] li:hover,
+    div[data-baseweb="popover"] [role="option"]:hover,
+    div[data-baseweb="popover"] [role="listbox"] li:hover {{
+        background-color: {colors["surface"]} !important;
+        color: {colors["text_primary"]} !important;
+    }}
+    
+    /* Hover state text content */
+    div[data-baseweb="popover"] li:hover *,
+    div[data-baseweb="popover"] [role="option"]:hover *,
+    div[data-baseweb="popover"] [role="listbox"] li:hover * {{
+        color: {colors["text_primary"]} !important;
+    }}
+
+    /* Selected option */
+    div[data-baseweb="popover"] [aria-selected="true"],
+    div[data-baseweb="popover"] [aria-selected="true"] *,
+    div[data-baseweb="popover"] li[aria-selected="true"],
+    div[data-baseweb="popover"] li[aria-selected="true"] *,
+    div[data-baseweb="popover"] [role="option"][aria-selected="true"],
+    div[data-baseweb="popover"] [role="option"][aria-selected="true"] * {{
+        background-color: {colors["accent"]} !important;
+        color: white !important;
+    }}
+
+    /* Dropdown arrow */
+    div[data-baseweb="select"] svg {{
+        fill: {colors["icon_color"]} !important;
+        color: {colors["icon_color"]} !important;
+    }}
+
+    /* Multiselect text input */
+    .stMultiSelect input {{
+        background-color: {colors["input_bg"]} !important;
+        color: {colors["input_text"]} !important;
+    }}
+    
+    /* Multiselect container and inner elements */
+    .stMultiSelect [data-baseweb="select"] > div,
+    .stMultiSelect [data-baseweb="select"] > div > div,
+    .stMultiSelect [data-baseweb="select"] > div > div > div {{
+        background-color: {colors["multiselect_bg"]} !important;
+        color: {colors["multiselect_text"]} !important;
+    }}
+
+
+
+
     /* Sidebar styling */
     [data-testid="stSidebar"] {{
         background: {colors["sidebar_bg"]};
@@ -197,12 +686,20 @@ def get_theme_css(theme: str) -> str:
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     }}
     
-    /* Placeholder text */
-    input::placeholder,
-    textarea::placeholder {{
-        color: {colors["text_secondary"]} !important;
-        opacity: 0.7;
-    }}
+        /* Placeholder text */
+        input::placeholder,
+        textarea::placeholder,
+        div[data-baseweb="select"] input::placeholder {{
+            color: {colors["text_muted"]} !important;
+            opacity: 1 !important;
+        }}
+        
+        /* BaseWeb select placeholder */
+        div[data-baseweb="select"] [placeholder],
+        .stMultiSelect input::placeholder {{
+            color: {colors["text_muted"]} !important;
+            opacity: 1 !important;
+        }}
     
     /* Text areas - professional styling */
     .stTextArea > div > div > textarea {{
@@ -262,15 +759,22 @@ def get_theme_css(theme: str) -> str:
     }}
     
     /* Selectbox selected value */
-    .stSelectbox [data-baseweb="select"] > div {{
+    .stSelectbox [data-baseweb="select"] > div,
+    .stSelectbox [data-baseweb="select"] > div > div {{
         color: {colors["input_text"]} !important;
         background-color: {colors["input_bg"]} !important;
     }}
     
+    /* Selectbox selected value text */
+    .stSelectbox [data-baseweb="select"] > div *,
+    .stSelectbox [data-baseweb="select"] > div > div * {{
+        color: {colors["input_text"]} !important;
+    }}
+    
     /* Premium Buttons - LinkedIn/Workday style */
     .stButton > button {{
-        background: {colors["accent"]};
-        color: white;
+        background: {colors["accent"]} !important;
+        color: white !important;
         border: none;
         border-radius: 6px;
         padding: 0.75rem 2rem;
@@ -281,18 +785,37 @@ def get_theme_css(theme: str) -> str:
         box-shadow: 0 2px 4px rgba(10, 102, 194, 0.2);
     }}
     
+    /* Ensure button text and inner elements are white */
+    .stButton > button *,
+    .stButton > button span,
+    .stButton > button div {{
+        color: white !important;
+        background-color: transparent !important;
+    }}
+    
     .stButton > button:hover {{
-        background: {colors["accent_hover"]};
+        background: {colors["accent_hover"]} !important;
+        color: white !important;
         transform: translateY(-1px);
         box-shadow: 0 4px 8px rgba(10, 102, 194, 0.3);
     }}
     
+    .stButton > button:hover * {{
+        color: white !important;
+        background-color: transparent !important;
+    }}
+    
     .stButton > button:disabled {{
-        background: {colors["border"]} !important;
-        color: {colors["text_secondary"]} !important;
+        background: {colors["button_disabled_bg"]} !important;
+        color: {colors["button_disabled_text"]} !important;
         cursor: not-allowed;
         transform: none;
         box-shadow: none;
+    }}
+    
+    .stButton > button:disabled * {{
+        color: {colors["button_disabled_text"]} !important;
+        background-color: transparent !important;
     }}
     
     /* Metrics - professional styling */
@@ -301,12 +824,14 @@ def get_theme_css(theme: str) -> str:
         font-size: 2rem;
         font-weight: 600;
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        background-color: transparent !important;
     }}
     
     [data-testid="stMetricLabel"] {{
         color: {colors["text_secondary"]} !important;
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
         font-size: 0.9rem;
+        background-color: transparent !important;
     }}
     
     /* Expanders - professional styling */
@@ -320,12 +845,48 @@ def get_theme_css(theme: str) -> str:
         font-weight: 500;
     }}
     
+    /* Expander header nested elements - transparent background, inherit text */
+    .streamlit-expanderHeader *,
+    .streamlit-expanderHeader > *,
+    .streamlit-expanderHeader div,
+    .streamlit-expanderHeader span,
+    .streamlit-expanderHeader p,
+    .streamlit-expanderHeader label {{
+        background-color: transparent !important;
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        color: {colors["text_primary"]} !important;
+    }}
+    
+    /* Dark expander headers - white text */
+    .streamlit-expanderHeader[style*="background"][style*="#0f"],
+    .streamlit-expanderHeader[style*="background"][style*="#1a"],
+    .streamlit-expanderHeader[style*="background"][style*="#1e"],
+    .streamlit-expanderHeader[style*="background-color"][style*="#0f"],
+    .streamlit-expanderHeader[style*="background-color"][style*="#1a"],
+    .streamlit-expanderHeader[style*="background-color"][style*="#1e"] {{
+        color: white !important;
+    }}
+    
+    .streamlit-expanderHeader[style*="background"][style*="#0f"] *,
+    .streamlit-expanderHeader[style*="background"][style*="#1a"] *,
+    .streamlit-expanderHeader[style*="background"][style*="#1e"] *,
+    .streamlit-expanderHeader[style*="background-color"][style*="#0f"] *,
+    .streamlit-expanderHeader[style*="background-color"][style*="#1a"] *,
+    .streamlit-expanderHeader[style*="background-color"][style*="#1e"] * {{
+        color: white !important;
+        background-color: transparent !important;
+    }}
+    
     /* Expander arrow/chevron - theme-aware */
     .streamlit-expanderHeader svg,
-    .streamlit-expanderHeader [data-testid="stExpanderToggleIcon"] {{
+    .streamlit-expanderHeader [data-testid="stExpanderToggleIcon"],
+    [data-testid="stExpanderToggleIcon"] {{
         fill: {colors["icon_color"]} !important;
         color: {colors["icon_color"]} !important;
         opacity: 1 !important;
+        stroke: {colors["icon_color"]} !important;
     }}
     
     .streamlit-expanderContent {{
@@ -337,6 +898,30 @@ def get_theme_css(theme: str) -> str:
         color: {colors["text_primary"]} !important;
     }}
     
+    /* ALL nested elements in expander content - transparent background */
+    .streamlit-expanderContent *,
+    .streamlit-expanderContent > *,
+    .streamlit-expanderContent div,
+    .streamlit-expanderContent span,
+    .streamlit-expanderContent p,
+    .streamlit-expanderContent label {{
+        background-color: transparent !important;
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        color: {colors["text_primary"]} !important;
+    }}
+    
+    /* Exclude actual inputs and buttons - they need their own styling */
+    .streamlit-expanderContent input[type="text"],
+    .streamlit-expanderContent input[type="number"],
+    .streamlit-expanderContent textarea,
+    .streamlit-expanderContent button,
+    .streamlit-expanderContent [data-testid="stButton"] > button,
+    .streamlit-expanderContent [data-testid="stDownloadButton"] > button {{
+        background-color: {colors["input_bg"]} !important;
+    }}
+    
     /* Sidebar expander arrows */
     [data-testid="stSidebar"] .streamlit-expanderHeader svg {{
         fill: {colors["icon_color"]} !important;
@@ -344,60 +929,285 @@ def get_theme_css(theme: str) -> str:
         opacity: 1 !important;
     }}
     
-    /* Info boxes - professional styling */
+    /* Info boxes - professional styling - FLAT like button */
     .stInfo {{
-        background-color: {colors["info_bg"]};
-        border-left: 3px solid {colors["accent"]};
+        background-color: {colors["info_bg"]} !important;
+        border: 1px solid {colors["card_border"]} !important;
+        border-left: 3px solid {colors["accent"]} !important;
         border-radius: 6px;
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-        color: {colors["text_primary"]};
+        color: {colors["text_primary"]} !important;
+    }}
+    
+    /* ALL nested elements - transparent background, inherit text color */
+    .stInfo *,
+    .stInfo > *,
+    .stInfo div,
+    .stInfo span,
+    .stInfo p,
+    .stInfo label {{
+        background-color: transparent !important;
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        color: {colors["text_primary"]} !important;
+    }}
+    
+    /* Exclude actual inputs and buttons - they need their own styling */
+    .stInfo input[type="text"],
+    .stInfo input[type="number"],
+    .stInfo textarea,
+    .stInfo button,
+    .stInfo [data-testid="stButton"] > button,
+    .stInfo [data-testid="stDownloadButton"] > button {{
+        background-color: {colors["input_bg"]} !important;
     }}
     
     .stSuccess {{
-        background-color: {colors["success_bg"]};
-        border-left: 3px solid #0d7377;
+        background-color: {colors["success_bg"]} !important;
+        border: 1px solid {colors["card_border"]} !important;
+        border-left: 3px solid #0d7377 !important;
         border-radius: 6px;
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-        color: {colors["text_primary"]};
+        color: {colors["text_primary"]} !important;
+    }}
+    
+    /* ALL nested elements - transparent background, inherit text color */
+    .stSuccess *,
+    .stSuccess > *,
+    .stSuccess div,
+    .stSuccess span,
+    .stSuccess p,
+    .stSuccess label {{
+        background-color: transparent !important;
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        color: {colors["text_primary"]} !important;
+    }}
+    
+    /* Exclude actual inputs and buttons - they need their own styling */
+    .stSuccess input[type="text"],
+    .stSuccess input[type="number"],
+    .stSuccess textarea,
+    .stSuccess button,
+    .stSuccess [data-testid="stButton"] > button,
+    .stSuccess [data-testid="stDownloadButton"] > button {{
+        background-color: {colors["input_bg"]} !important;
     }}
     
     .stWarning {{
-        background-color: {colors["warning_bg"]};
-        border-left: 3px solid #f59e0b;
+        background-color: {colors["warning_bg"]} !important;
+        border: 1px solid {colors["card_border"]} !important;
+        border-left: 3px solid #f59e0b !important;
         border-radius: 6px;
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-        color: {colors["text_primary"]};
+        color: {colors["text_primary"]} !important;
+    }}
+    
+    /* ALL nested elements - transparent background, inherit text color */
+    .stWarning *,
+    .stWarning > *,
+    .stWarning div,
+    .stWarning span,
+    .stWarning p,
+    .stWarning label {{
+        background-color: transparent !important;
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        color: {colors["text_primary"]} !important;
+    }}
+    
+    /* Exclude actual inputs and buttons - they need their own styling */
+    .stWarning input[type="text"],
+    .stWarning input[type="number"],
+    .stWarning textarea,
+    .stWarning button,
+    .stWarning [data-testid="stButton"] > button,
+    .stWarning [data-testid="stDownloadButton"] > button {{
+        background-color: {colors["input_bg"]} !important;
     }}
     
     .stError {{
-        background-color: {colors["error_bg"]};
-        border-left: 3px solid #d93025;
+        background-color: {colors["error_bg"]} !important;
+        border: 1px solid {colors["card_border"]} !important;
+        border-left: 3px solid #d93025 !important;
         border-radius: 6px;
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-        color: {colors["text_primary"]};
+        color: {colors["text_primary"]} !important;
+    }}
+    
+    /* ALL nested elements - transparent background, inherit text color */
+    .stError *,
+    .stError > *,
+    .stError div,
+    .stError span,
+    .stError p,
+    .stError label {{
+        background-color: transparent !important;
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        color: {colors["text_primary"]} !important;
+    }}
+    
+    /* Exclude actual inputs and buttons - they need their own styling */
+    .stError input[type="text"],
+    .stError input[type="number"],
+    .stError textarea,
+    .stError button,
+    .stError [data-testid="stButton"] > button,
+    .stError [data-testid="stDownloadButton"] > button {{
+        background-color: {colors["input_bg"]} !important;
     }}
     
     /* Dataframes */
-    .dataframe {{
-        background-color: {colors["dataframe_bg"]};
-        color: {colors["dataframe_text"]};
+    .dataframe,
+    .dataframe *,
+    .dataframe th,
+    .dataframe td,
+    .dataframe thead,
+    .dataframe tbody {{
+        background-color: {colors["dataframe_bg"]} !important;
+        color: {colors["dataframe_text"]} !important;
     }}
     
-    /* Radio buttons */
+    /* Radio buttons - base container */
     .stRadio > div {{
-        background-color: {colors["radio_bg"]};
-        padding: 1rem;
-        border-radius: 8px;
-        border: 1px solid {colors["radio_border"]};
+        background-color: {colors["radio_bg"]} !important;
+        padding: 0.35rem;
+        border-radius: 9999px;
+        border: 1px solid {colors["radio_border"]} !important;
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }}
+
+    /* Horizontal JD Type radio group as segmented control */
+    .stRadio [role="radiogroup"][aria-orientation="horizontal"] {{
+        display: inline-flex !important;
+        gap: 0;
+        border-radius: 9999px;
+        overflow: hidden;
+    }}
+    
+    /* Radio button options container */
+    .stRadio > div > div,
+    .stRadio > div > div > div,
+    .stRadio [role="radiogroup"][aria-orientation="horizontal"] > div {{
+        background-color: transparent !important;
+        border: none !important;
+    }}
+    
+    /* Radio button option items (segments) - base styling */
+    .stRadio [role="radiogroup"][aria-orientation="horizontal"] label {{
+        color: {colors["text_primary"]} !important;
+        background-color: transparent !important;
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        font-weight: 400;
+        padding: 0.4rem 1rem;
+        padding-left: 0.4rem;
+        border-radius: 9999px;
+        transition: all 0.2s ease;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: flex-start;
+        white-space: nowrap;
+        min-width: fit-content;
+    }}
+    
+    /* Radio button option hover state - only for unselected */
+    .stRadio [role="radiogroup"][aria-orientation="horizontal"] input[type="radio"]:not(:checked) + label:hover {{
+        background-color: {colors["surface"]} !important;
+        opacity: 1;
+    }}
+    
+    /* Selected option should not change on hover */
+    .stRadio [role="radiogroup"][aria-orientation="horizontal"] input[type="radio"]:checked + label:hover {{
+        background-color: {colors["accent"]} !important;
+        color: white !important;
+    }}
+    
+    /* Show and style radio dots - clearly visible in Light Mode */
+    .stRadio [role="radiogroup"][aria-orientation="horizontal"] input[type="radio"] {{
+        position: relative !important;
+        opacity: 1 !important;
+        width: 18px !important;
+        height: 18px !important;
+        margin: 0 0.5rem 0 0 !important;
+        padding: 0 !important;
+        cursor: pointer;
+        accent-color: {colors["accent"]} !important;
+        -webkit-appearance: radio;
+        appearance: radio;
+    }}
+    
+    /* Radio dot - checked state - clearly visible colored dot */
+    .stRadio [role="radiogroup"][aria-orientation="horizontal"] input[type="radio"]:checked {{
+        accent-color: {colors["accent"]} !important;
+        border-color: {colors["accent"]} !important;
+    }}
+    
+    /* Ensure radio dot is visible with accent color */
+    .stRadio [role="radiogroup"][aria-orientation="horizontal"] input[type="radio"]:checked::before {{
+        content: "";
+        display: block;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background-color: {colors["accent"]} !important;
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+    }}
+    
+    /* Selected segment state - VERY CLEAR in Light Mode */
+    .stRadio [role="radiogroup"][aria-orientation="horizontal"] input[type="radio"]:checked + label,
+    .stRadio [role="radiogroup"][aria-orientation="horizontal"] input[type="radio"]:checked ~ label,
+    .stRadio [role="radiogroup"][aria-orientation="horizontal"] label[for*="jd_mode"]:has(+ input[type="radio"]:checked),
+    .stRadio [role="radiogroup"][aria-orientation="horizontal"] > div > div:has(input[type="radio"]:checked) label {{
+        background-color: {colors["accent"]} !important;
+        color: white !important;
+        font-weight: 700 !important;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+    }}
+    
+    /* Unselected segments - clearly inactive */
+    .stRadio [role="radiogroup"][aria-orientation="horizontal"] input[type="radio"]:not(:checked) + label,
+    .stRadio [role="radiogroup"][aria-orientation="horizontal"] input[type="radio"]:not(:checked) ~ label,
+    .stRadio [role="radiogroup"][aria-orientation="horizontal"] > div > div:not(:has(input[type="radio"]:checked)) label {{
+        background-color: transparent !important;
+        color: {colors["text_secondary"]} !important;
+        font-weight: 400 !important;
+        opacity: 0.7;
+    }}
+    
+    /* Ensure selected state is always visible - additional selectors */
+    .stRadio [role="radiogroup"][aria-orientation="horizontal"] input[type="radio"][checked] + label,
+    .stRadio [role="radiogroup"][aria-orientation="horizontal"] [aria-checked="true"] + label {{
+        background-color: {colors["accent"]} !important;
+        color: white !important;
+        font-weight: 700 !important;
     }}
     
     /* File uploader - professional styling */
     [data-testid="stFileUploader"] {{
-        background-color: {colors["uploader_bg"]};
+        background-color: {colors["uploader_bg"]} !important;
         border-radius: 6px;
         padding: 1rem;
-        border: 2px dashed {colors["uploader_border"]};
+        border: 2px dashed {colors["uploader_border"]} !important;
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }}
+    
+    /* File uploader inner section */
+    [data-testid="stFileUploader"] section,
+    [data-testid="stFileUploader"] > div,
+    [data-testid="stFileUploader"] > div > div,
+    [data-testid="stFileUploader"] section *,
+    [data-testid="stFileUploader"] > div * {{
+        background-color: {colors["uploader_bg"]} !important;
+        color: {colors["text_primary"]} !important;
     }}
     
     /* Progress bar */
@@ -413,12 +1223,30 @@ def get_theme_css(theme: str) -> str:
     
     /* Custom card styling */
     .enterprise-card {{
-        background: {colors["card_bg"]};
-        border: 1px solid {colors["card_border"]};
+        background: {colors["card_bg"]} !important;
+        border: 1px solid {colors["card_border"]} !important;
         border-radius: 12px;
         padding: 1.5rem;
         margin: 1rem 0;
-        box-shadow: {'0 4px 6px rgba(0, 0, 0, 0.3)' if theme == 'dark' else '0 2px 4px rgba(0, 0, 0, 0.1)'};
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        color: {colors["text_primary"]} !important;
+    }}
+    
+    /* Text inside enterprise cards - no background override */
+    .enterprise-card p,
+    .enterprise-card div:not([class*="st"]):not([data-testid]),
+    .enterprise-card span:not([class*="st"]):not([data-testid]) {{
+        color: {colors["text_primary"]} !important;
+        background-color: transparent !important;
+    }}
+    
+    /* Exclude inputs and buttons from background inheritance */
+    .enterprise-card input,
+    .enterprise-card button,
+    .enterprise-card [data-testid="stButton"],
+    .enterprise-card [data-testid="stDownloadButton"],
+    .enterprise-card [data-testid="stNumberInput"] {{
+        background-color: {colors["input_bg"]} !important;
     }}
     
     /* Score badges */
@@ -439,6 +1267,7 @@ def get_theme_css(theme: str) -> str:
         font-weight: 700;
         font-size: 1.2rem;
     }}
+
     
     /* Multiselect - professional styling to match theme */
     .stMultiSelect > div > div {{
@@ -446,6 +1275,13 @@ def get_theme_css(theme: str) -> str:
         border: 1px solid {colors["multiselect_border"]} !important;
         border-radius: 6px;
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }}
+    
+    /* Multiselect tags container */
+    .stMultiSelect [data-baseweb="select"] > div,
+    .stMultiSelect [data-baseweb="select"] > div > div {{
+        background-color: {colors["multiselect_bg"]} !important;
+        color: {colors["multiselect_text"]} !important;
     }}
     
     /* Multiselect dropdown arrow - theme-aware */
@@ -461,9 +1297,10 @@ def get_theme_css(theme: str) -> str:
         color: {colors["text_primary"]} !important;
     }}
     
-    /* Selected items (tags/chips) - blue theme */
-    .stMultiSelect [data-baseweb="tag"] {{
-        background-color: {colors["accent"]} !important;
+    /* Selected items (tags/chips) - dark background with white text */
+    .stMultiSelect [data-baseweb="tag"],
+    .stMultiSelect [data-baseweb="tag"] * {{
+        background-color: #111827 !important;
         color: white !important;
         border: none !important;
         border-radius: 4px !important;
@@ -474,13 +1311,15 @@ def get_theme_css(theme: str) -> str:
     }}
     
     .stMultiSelect [data-baseweb="tag"]:hover {{
-        background-color: {colors["accent_hover"]} !important;
+        background-color: #1f2937 !important;
     }}
     
     /* Remove button (X) in tags */
     .stMultiSelect [data-baseweb="tag"] [role="button"],
-    .stMultiSelect [data-baseweb="tag"] button {{
+    .stMultiSelect [data-baseweb="tag"] button,
+    .stMultiSelect [data-baseweb="tag"] svg {{
         color: white !important;
+        fill: white !important;
         opacity: 0.9 !important;
     }}
     
@@ -494,13 +1333,21 @@ def get_theme_css(theme: str) -> str:
     /* Alternative selectors for multiselect tags */
     .stMultiSelect span[data-testid="stMarkdownContainer"] span,
     .stMultiSelect div[style*="background"] {{
-        background-color: {colors["accent"]} !important;
+        background-color: #111827 !important;
         color: white !important;
     }}
     
-    /* Target any red/chip-like elements in multiselect */
+    /* Target any chip-like elements in multiselect */
     .stMultiSelect > div > div > div > div[style*="rgb"] {{
-        background-color: {colors["accent"]} !important;
+        background-color: #111827 !important;
+        color: white !important;
+    }}
+    
+    /* Ensure no white backgrounds inside chips */
+    .stMultiSelect [data-baseweb="tag"] span,
+    .stMultiSelect [data-baseweb="tag"] div,
+    .stMultiSelect [data-baseweb="tag"] > * {{
+        background-color: transparent !important;
         color: white !important;
     }}
     
@@ -519,22 +1366,26 @@ def get_theme_css(theme: str) -> str:
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
     }}
     
-    /* Override any red colors in multiselect */
-    .stMultiSelect * {{
-        --primary-color: {colors["accent"]} !important;
-    }}
     
-    /* Style for selected option chips/tags - comprehensive override */
+    /* Style for selected option chips/tags - dark background with white text */
     div[data-baseweb="select"] [data-baseweb="tag"],
     div[data-baseweb="select"] span[style*="background-color: rgb"],
     .stMultiSelect div[style*="background-color: rgb(255"] {{
-        background-color: {colors["accent"]} !important;
+        background-color: #111827 !important;
         color: white !important;
-        border-color: {colors["accent"]} !important;
+        border-color: #111827 !important;
+    }}
+    
+    /* Ensure chip inner elements have no white backgrounds */
+    div[data-baseweb="select"] [data-baseweb="tag"] *,
+    div[data-baseweb="select"] [data-baseweb="tag"] span,
+    div[data-baseweb="select"] [data-baseweb="tag"] div {{
+        background-color: transparent !important;
+        color: white !important;
     }}
     
     /* ============================================
-       DROPDOWN OPTIONS MENU (CRITICAL FOR LIGHT MODE)
+       DROPDOWN OPTIONS MENU
        ============================================ */
     
     /* Selectbox dropdown menu/popover */
@@ -555,14 +1406,26 @@ def get_theme_css(theme: str) -> str:
     
     /* Dropdown option hover state */
     div[data-baseweb="popover"] [role="option"]:hover,
-    div[data-baseweb="popover"] li:hover {{
+    div[data-baseweb="popover"] li:hover,
+    div[data-baseweb="popover"] [role="listbox"] li:hover {{
         background-color: {colors["surface"]} !important;
+        color: {colors["text_primary"]} !important;
+    }}
+    
+    /* Dropdown option hover state text */
+    div[data-baseweb="popover"] [role="option"]:hover *,
+    div[data-baseweb="popover"] li:hover *,
+    div[data-baseweb="popover"] [role="listbox"] li:hover * {{
         color: {colors["text_primary"]} !important;
     }}
     
     /* Dropdown option selected state */
     div[data-baseweb="popover"] [role="option"][aria-selected="true"],
-    div[data-baseweb="popover"] li[aria-selected="true"] {{
+    div[data-baseweb="popover"] li[aria-selected="true"],
+    div[data-baseweb="popover"] [role="listbox"] li[aria-selected="true"],
+    div[data-baseweb="popover"] [role="option"][aria-selected="true"] *,
+    div[data-baseweb="popover"] li[aria-selected="true"] *,
+    div[data-baseweb="popover"] [role="listbox"] li[aria-selected="true"] * {{
         background-color: {colors["accent"]} !important;
         color: white !important;
     }}
@@ -583,7 +1446,8 @@ def get_theme_css(theme: str) -> str:
     }}
     
     /* Multiselect option selected/checked */
-    .stMultiSelect div[data-baseweb="popover"] [role="option"][aria-selected="true"] {{
+    .stMultiSelect div[data-baseweb="popover"] [role="option"][aria-selected="true"],
+    .stMultiSelect div[data-baseweb="popover"] [role="option"][aria-selected="true"] * {{
         background-color: {colors["accent"]} !important;
         color: white !important;
     }}
@@ -595,10 +1459,13 @@ def get_theme_css(theme: str) -> str:
     /* Sidebar icons */
     [data-testid="stSidebar"] svg,
     [data-testid="stSidebar"] [class*="icon"],
-    [data-testid="stSidebar"] [class*="arrow"] {{
+    [data-testid="stSidebar"] [class*="arrow"],
+    [data-testid="stSidebar"] .streamlit-expanderHeader svg,
+    [data-testid="stSidebar"] [data-testid="stExpanderToggleIcon"] {{
         fill: {colors["icon_color"]} !important;
         color: {colors["icon_color"]} !important;
         opacity: 1 !important;
+        stroke: {colors["icon_color"]} !important;
     }}
     
     /* Sidebar text */
@@ -619,10 +1486,33 @@ def get_theme_css(theme: str) -> str:
        ADDITIONAL FIXES
        ============================================ */
     
-    /* Radio button labels */
-    .stRadio label {{
+    /* Result sections and cards - ensure readable text in light mode */
+    [data-testid="stVerticalBlock"],
+    [data-testid="stHorizontalBlock"],
+    [data-testid="stMarkdownContainer"],
+    [class*="result"],
+    [class*="candidate"],
+    [class*="ranking"] {{
+        background-color: {colors["app_bg"]} !important;
         color: {colors["text_primary"]} !important;
     }}
+    
+    [data-testid="stVerticalBlock"] *,
+    [data-testid="stHorizontalBlock"] *,
+    [data-testid="stMarkdownContainer"] * {{
+        color: {colors["text_primary"]} !important;
+    }}
+    
+    /* Download buttons and action buttons */
+    [data-testid="stDownloadButton"] > button,
+    [data-testid="stDownloadButton"] > button *,
+    a[download],
+    a[href*="download"] {{
+        background-color: {colors["accent"]} !important;
+        color: white !important;
+    }}
+    
+    /* Radio button labels - consolidated with main radio styling above */
     
     /* Number input */
     .stNumberInput > div > div > input {{
@@ -631,9 +1521,63 @@ def get_theme_css(theme: str) -> str:
         border: 1px solid {colors["input_border"]} !important;
     }}
     
+    /* Number input label - ensure visibility */
+    .stNumberInput label,
+    .stNumberInput [data-testid="stWidgetLabel"],
+    .stNumberInput [data-testid="stWidgetLabel"] * {{
+        color: {colors["text_primary"]} !important;
+        background-color: transparent !important;
+        background: transparent !important;
+    }}
+    
+    /* Number input container - remove white boxes */
+    .stNumberInput > div,
+    .stNumberInput > div > div {{
+        background-color: transparent !important;
+        background: transparent !important;
+    }}
+    
+    /* Number input on dark backgrounds - white text */
+    [style*="background"][style*="#0f"] .stNumberInput label,
+    [style*="background"][style*="#1a"] .stNumberInput label,
+    [style*="background"][style*="#1e"] .stNumberInput label,
+    [style*="background-color"][style*="#0f"] .stNumberInput label,
+    [style*="background-color"][style*="#1a"] .stNumberInput label,
+    [style*="background-color"][style*="#1e"] .stNumberInput label {{
+        color: white !important;
+    }}
+    
     /* File uploader text */
     [data-testid="stFileUploader"] label,
-    [data-testid="stFileUploader"] p {{
+    [data-testid="stFileUploader"] p,
+    [data-testid="stFileUploader"] span,
+    [data-testid="stFileUploader"] div,
+    [data-testid="stFileUploader"] button,
+    [data-testid="stFileUploader"] button * {{
+        color: {colors["text_primary"]} !important;
+        background-color: transparent !important;
+    }}
+    
+    /* File uploader helper text */
+    [data-testid="stFileUploader"] small,
+    [data-testid="stFileUploader"] [class*="caption"] {{
+        color: {colors["text_secondary"]} !important;
+    }}
+    
+    /* Result sections and cards - ensure readable text in light mode */
+    [data-testid="stVerticalBlock"],
+    [data-testid="stHorizontalBlock"],
+    [data-testid="stMarkdownContainer"],
+    [class*="result"],
+    [class*="candidate"],
+    [class*="ranking"] {{
+        background-color: {colors["app_bg"]} !important;
+        color: {colors["text_primary"]} !important;
+    }}
+    
+    [data-testid="stVerticalBlock"] *,
+    [data-testid="stHorizontalBlock"] *,
+    [data-testid="stMarkdownContainer"] * {{
         color: {colors["text_primary"]} !important;
     }}
     
@@ -647,8 +1591,8 @@ def get_theme_css(theme: str) -> str:
     [data-baseweb="popover"][role="tooltip"],
     div[role="tooltip"],
     [role="tooltip"] {{
-        background-color: {colors["surface"]} !important;
-        color: {colors["text_primary"]} !important;
+        background-color: {colors["tooltip_bg"]} !important;
+        color: {colors["tooltip_text"]} !important;
         border: 1px solid {colors["border"]} !important;
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2) !important;
     }}
@@ -669,7 +1613,7 @@ def get_theme_css(theme: str) -> str:
     [data-baseweb="popover"][role="tooltip"] p,
     div[role="tooltip"] p,
     [role="tooltip"] p {{
-        color: {colors["text_primary"]} !important;
+        color: {colors["tooltip_text"]} !important;
         background-color: transparent !important;
     }}
     
@@ -678,8 +1622,8 @@ def get_theme_css(theme: str) -> str:
     [data-testid="stTooltip"] *,
     [data-testid="stTooltip"] span,
     [data-testid="stTooltip"] p {{
-        color: {colors["text_primary"]} !important;
-        background-color: {colors["surface"]} !important;
+        color: {colors["tooltip_text"]} !important;
+        background-color: {colors["tooltip_bg"]} !important;
     }}
     
     /* Tooltip arrow/pointer styling */
@@ -695,8 +1639,8 @@ def get_theme_css(theme: str) -> str:
     [class*="tooltip"],
     [class*="Tooltip"],
     [class*="Popover"][role="tooltip"] {{
-        background-color: {colors["surface"]} !important;
-        color: {colors["text_primary"]} !important;
+        background-color: {colors["tooltip_bg"]} !important;
+        color: {colors["tooltip_text"]} !important;
     }}
     
     [class*="tooltip"] *,
@@ -730,11 +1674,15 @@ def get_theme_css(theme: str) -> str:
             opacity: 1;
         }}
     }}
+    
+    {light_mode_global_fix}
+    
+    {light_mode_dark_section_fixes}
 </style>
 """
 
 
-# Apply theme-based CSS (re-inject on theme change)
+# Apply theme-based CSS
 current_css = get_theme_css(st.session_state.theme)
 st.markdown(current_css, unsafe_allow_html=True)
 
@@ -982,6 +1930,27 @@ def generate_job_description(
     Returns:
         Generated job description text
     """
+    # Validate all required fields are provided
+    if not job_title or not job_title.strip():
+        st.error("❌ Job Title is required. Please fill in all required fields (marked with *).")
+        return ""
+    
+    if not experience or not experience.strip():
+        st.error("❌ Experience is required. Please fill in all required fields (marked with *).")
+        return ""
+    
+    if not domain or not domain.strip():
+        st.error("❌ Domain is required. Please fill in all required fields (marked with *).")
+        return ""
+    
+    if not seniority or not seniority.strip():
+        st.error("❌ Seniority Level is required. Please fill in all required fields (marked with *).")
+        return ""
+    
+    if not location or not location.strip():
+        st.error("❌ Location is required. Please fill in all required fields (marked with *).")
+        return ""
+    
     openai_api_key = os.getenv("OPENAI_API_KEY")
     if not openai_api_key:
         st.error("OpenAI API key not found. Please configure OPENAI_API_KEY in environment.")
@@ -989,29 +1958,53 @@ def generate_job_description(
     
     client = OpenAI(api_key=openai_api_key)
     
-    prompt = f"""Generate a professional, enterprise-grade job description for the following role.
+    # Prepare skills text - use empty string if not provided
+    skills_text = key_skills.strip() if key_skills else ""
+    
+    # Build skills note for prompt (avoid nested f-strings)
+    skills_note = f"Note: Must include these key skills: {skills_text}" if skills_text else ""
+    skills_rule = f"9. Required Skills must include: {skills_text}" if skills_text else ""
+    
+    prompt = f"""Generate a professional, enterprise-grade Job Description using the following STRICT STRUCTURE.
+
+The output MUST start with a header section in this exact order:
 
 Job Title: {job_title}
-Experience Required: {experience} years
-Domain: {domain}
-Seniority Level: {seniority}
+Experience Required: {experience}
 Location: {location}
-Key Skills: {key_skills}
 
-Requirements:
-1. Use corporate, professional tone
-2. Make it ATS-friendly (no emojis, no markdown)
-3. Structure must include:
-   - Role Summary (2-3 sentences)
-   - Roles & Responsibilities (bullet points)
-   - Required Skills (list)
-   - Preferred Skills (list)
-   - Experience & Education Requirements
+After the header, include the following sections in order:
 
-Output format: Plain text only, no markdown, no emojis, no code blocks.
-Use clear sections with headers in plain text format.
+Role Summary (2-3 concise paragraphs)
 
-Generate the complete job description now:"""
+Roles & Responsibilities (bullet points)
+
+Required Skills (bullet points)
+{skills_note}
+
+Preferred Skills (bullet points)
+
+Experience & Education Requirements
+
+STRICT RULES (DO NOT VIOLATE):
+
+1. Use the values exactly as provided by the user
+2. Do NOT repeat Job Title or Location inside Role Summary
+3. Do NOT use placeholders like "Please insert location", "TBD", "Not specified", or similar
+4. Do NOT invent or modify experience or location
+5. If location is "Remote", show exactly: Location: Remote
+6. Experience must be stated exactly as: {experience}
+7. Domain must be stated exactly as: {domain}
+8. Seniority Level must be stated exactly as: {seniority}
+{skills_rule}
+
+Output format:
+Plain text only
+No markdown
+No emojis
+No code blocks
+
+Generate the complete job description now following this exact structure:"""
 
     try:
         response = client.chat.completions.create(
@@ -1340,18 +2333,20 @@ def main():
     
     # Sidebar - HR-friendly content only (collapsible)
     with st.sidebar:
-        # Theme toggle (top of sidebar)
+        # Theme toggle
         theme_col1, theme_col2 = st.columns([1, 3])
         with theme_col1:
-            theme_icon = "☀️" if st.session_state.theme == "dark" else "🌙"
-            theme_label = "Light" if st.session_state.theme == "dark" else "Dark"
-            if st.button(theme_icon, key="theme_toggle", help=f"Switch to {theme_label} mode", use_container_width=True):
+            theme_icon = "🌙" if st.session_state.theme == "dark" else "☀️"
+            if st.button(theme_icon, key="theme_toggle", help=f"Switch to {'Light' if st.session_state.theme == 'dark' else 'Dark'} mode", use_container_width=True):
+                # Toggle theme without resetting other session state
                 st.session_state.theme = "light" if st.session_state.theme == "dark" else "dark"
+                # Rerun to apply new theme CSS - session state persists automatically
                 st.rerun()
         with theme_col2:
-            theme = get_theme()
-            text_secondary = theme["text_secondary"]
-            st.markdown(f"<div style='margin-top:8px; color: {text_secondary}; font-size: 0.85rem;'>{theme_label} Mode</div>", unsafe_allow_html=True)
+            theme_colors = get_theme()
+            text_secondary = theme_colors["text_secondary"]
+            theme_label = "Dark Mode" if st.session_state.theme == "dark" else "Light Mode"
+            st.markdown(f"<div style='margin-top:8px; color: {text_secondary}; font-size: 0.85rem;'>{theme_label}</div>", unsafe_allow_html=True)
         
         st.markdown("---")
         
@@ -1464,19 +2459,31 @@ def main():
         
         # Generate button
         if st.button("✨ Generate Job Description", type="primary", use_container_width=True):
-            with st.spinner("Generating professional job description..."):
-                generated_jd = generate_job_description(
-                    job_title=job_title,
-                    experience=experience,
-                    domain=domain,
-                    seniority=seniority,
-                    location=location,
-                    key_skills=key_skills
-                )
-                
-                if generated_jd:
-                    st.session_state.generated_jd = generated_jd
-                    st.success("Job description generated successfully!")
+            # Validate required fields before generation
+            if not job_title or not job_title.strip():
+                st.error("❌ Please fill in all required fields (marked with *). Job Title is required.")
+            elif not experience or not experience.strip():
+                st.error("❌ Please fill in all required fields (marked with *). Experience is required.")
+            elif not domain or not domain.strip():
+                st.error("❌ Please fill in all required fields (marked with *). Domain is required.")
+            elif not seniority or not seniority.strip():
+                st.error("❌ Please fill in all required fields (marked with *). Seniority Level is required.")
+            elif not location or not location.strip():
+                st.error("❌ Please fill in all required fields (marked with *). Location is required.")
+            else:
+                with st.spinner("Generating professional job description..."):
+                    generated_jd = generate_job_description(
+                        job_title=job_title.strip(),
+                        experience=experience.strip(),
+                        domain=domain.strip(),
+                        seniority=seniority.strip(),
+                        location=location.strip(),
+                        key_skills=key_skills.strip() if key_skills else ""
+                    )
+                    
+                    if generated_jd:
+                        st.session_state.generated_jd = generated_jd
+                        st.success("Job description generated successfully!")
         
         # Display generated JD and allow editing
         if st.session_state.generated_jd:

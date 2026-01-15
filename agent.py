@@ -27,7 +27,7 @@ class CVAnalysisAgent:
         
         Args:
             openai_api_key: OpenAI API key
-            model_name: Model to use (default: gpt-4-turbo-preview, closest to GPT-4.1)
+            model_name: Model to use (default: gpt-4.1, closest to GPT-4.1)
         """
         self.llm = ChatOpenAI(
             openai_api_key=openai_api_key,
