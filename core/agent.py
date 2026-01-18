@@ -91,6 +91,15 @@ Return ONLY valid JSON, no additional text.
             Dictionary with analysis results
         """
         try:
+            # Validate inputs before processing
+            if not jd_text or not jd_text.strip():
+                logger.error("Empty job description provided")
+                return self._get_default_analysis("Please provide a Job Description.")
+            
+            if not cv_text or not cv_text.strip():
+                logger.error("Empty CV text provided")
+                return self._get_default_analysis("Please provide a CV.")
+            
             # Truncate texts if too long (to avoid token limits)
             max_chars = 15000
             jd_text = jd_text[:max_chars] if len(jd_text) > max_chars else jd_text
@@ -102,17 +111,35 @@ Return ONLY valid JSON, no additional text.
                 cv_text=cv_text
             )
             
-            # Parse JSON response
+            # Validate result is not empty
+            if not result:
+                logger.error("LLM returned empty response")
+                return self._get_default_analysis("LLM returned empty output. Please try again.")
+            
             # Clean result (remove markdown code blocks if present)
             result = result.strip()
+            
             if result.startswith("```json"):
                 result = result[7:]
-            if result.startswith("```"):
+            elif result.startswith("```"):
                 result = result[3:]
+            
             if result.endswith("```"):
                 result = result[:-3]
+            
             result = result.strip()
             
+            # Validate cleaned result is not empty
+            if not result:
+                logger.error("LLM returned empty output after cleaning")
+                return self._get_default_analysis("LLM returned empty output. Please try again.")
+            
+            # Validate before parsing JSON
+            if not result or not result.strip():
+                logger.error("Empty response received before JSON parsing")
+                return self._get_default_analysis("Empty response received. Please try again.")
+            
+            # Parse JSON response
             analysis = json.loads(result)
             
             # Validate and set defaults
@@ -134,13 +161,14 @@ Return ONLY valid JSON, no additional text.
             
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse JSON response: {str(e)}")
-            logger.error(f"Raw response: {result[:500]}")
-            return self._get_default_analysis()
+            if 'result' in locals():
+                logger.error(f"Raw response: {result[:500] if result else 'None'}")
+            return self._get_default_analysis("Analysis could not be completed. Please try again.")
         except Exception as e:
             logger.error(f"Error analyzing CV: {str(e)}")
-            return self._get_default_analysis()
+            return self._get_default_analysis("Analysis could not be completed. Please try again.")
     
-    def _get_default_analysis(self) -> Dict:
+    def _get_default_analysis(self, explanation: str = "Analysis could not be completed. Please try again.") -> Dict:
         """Return default analysis structure on error"""
         return {
             "candidate_name": "Unknown",
@@ -150,7 +178,7 @@ Return ONLY valid JSON, no additional text.
             "seniority_score": 0.0,
             "matched_skills": [],
             "missing_skills": [],
-            "explanation": "Analysis encountered an error. Please review manually."
+            "explanation": explanation
         }
     
     def extract_jd_requirements(self, jd_text: str) -> Dict[str, List[str]]:
@@ -186,20 +214,79 @@ Return ONLY valid JSON, no additional text.
         extraction_chain = LLMChain(llm=self.llm, prompt=extraction_prompt)
         
         try:
+            # Validate input
+            if not jd_text or not jd_text.strip():
+                logger.error("Empty job description provided for extraction")
+                return {
+                    "required_skills": [],
+                    "required_tools": [],
+                    "required_experience_years": 0,
+                    "seniority_level": "unknown",
+                    "key_responsibilities": []
+                }
+            
             result = extraction_chain.run(job_description=jd_text[:10000])
+            
+            # Validate result is not empty
+            if not result:
+                logger.error("LLM returned empty response for JD extraction")
+                return {
+                    "required_skills": [],
+                    "required_tools": [],
+                    "required_experience_years": 0,
+                    "seniority_level": "unknown",
+                    "key_responsibilities": []
+                }
             
             # Clean and parse JSON
             result = result.strip()
+            
             if result.startswith("```json"):
                 result = result[7:]
-            if result.startswith("```"):
+            elif result.startswith("```"):
                 result = result[3:]
+            
             if result.endswith("```"):
                 result = result[:-3]
+            
             result = result.strip()
             
+            # Validate cleaned result is not empty
+            if not result:
+                logger.error("LLM returned empty output after cleaning for JD extraction")
+                return {
+                    "required_skills": [],
+                    "required_tools": [],
+                    "required_experience_years": 0,
+                    "seniority_level": "unknown",
+                    "key_responsibilities": []
+                }
+            
+            # Validate before parsing JSON
+            if not result or not result.strip():
+                logger.error("Empty response received before JSON parsing for JD extraction")
+                return {
+                    "required_skills": [],
+                    "required_tools": [],
+                    "required_experience_years": 0,
+                    "seniority_level": "unknown",
+                    "key_responsibilities": []
+                }
+            
+            # Parse JSON response
             requirements = json.loads(result)
             return requirements
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse JSON response for JD extraction: {str(e)}")
+            if 'result' in locals():
+                logger.error(f"Raw response: {result[:500] if result else 'None'}")
+            return {
+                "required_skills": [],
+                "required_tools": [],
+                "required_experience_years": 0,
+                "seniority_level": "unknown",
+                "key_responsibilities": []
+            }
         except Exception as e:
             logger.error(f"Error extracting JD requirements: {str(e)}")
             return {

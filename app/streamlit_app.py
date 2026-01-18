@@ -9,10 +9,16 @@ import pandas as pd
 from typing import List, Dict, Optional
 import os
 import time
+import json
+import logging
 from pathlib import Path
 from dotenv import load_dotenv
 from openai import OpenAI
 import base64
+
+
+
+logger = logging.getLogger(__name__)
 
 def img_to_base64(path):
     with open(path, "rb") as f:
@@ -48,11 +54,32 @@ st.set_page_config(
     page_title="HR AI Agent - Talent Intelligence Platform",
     page_icon="🎯",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed"
 )
+
+st.markdown("""
+<style>
+/* FIX: Force header height parity between dark & light */
+header[data-testid="stHeader"] {
+    height: 64px !important;
+    padding-top: 0 !important;
+    margin-top: 0 !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
 
 # Load environment variables
 load_dotenv()
+
+# ============================================
+# AUTHENTICATION STATE INITIALIZATION
+# ============================================
+if "authenticated" not in st.session_state:
+    st.session_state.authenticated = False
+
+if "page" not in st.session_state:
+    st.session_state.page = "login"
 
 # Initialize theme in session state (must be before CSS injection)
 if "theme" not in st.session_state:
@@ -103,7 +130,7 @@ THEME_CONFIG = {
     },
     "light": {
         "app_bg": "#FFFFFF",
-        "sidebar_bg": "#FFFFFF",
+        "sidebar_bg": "#F1F5F9",
         "text_primary": "#111827",
         "text_secondary": "#4B5563",
         "text_muted": "#6B7280",
@@ -161,378 +188,6 @@ def get_theme_css(theme: str) -> str:
         CSS string for the selected theme
     """
     colors = THEME_CONFIG.get(theme, THEME_CONFIG["dark"])
-    
-    # Light-mode-only global fix for white boxes inside colored containers
-    light_mode_global_fix = ""
-    if theme == "light":
-        light_mode_global_fix = f"""
-    /* ============================================
-       GLOBAL FIX: Remove white boxes inside colored containers (Light Mode Only)
-       Rule-based approach: All informational containers get flat styling
-       ============================================ */
-    
-    /* Target ALL informational/message containers - comprehensive list */
-    .stInfo,
-    .stSuccess,
-    .stWarning,
-    .stError,
-    [data-testid="stMarkdownContainer"],
-    [data-testid="stVerticalBlock"],
-    [data-testid="stHorizontalBlock"],
-    [class*="result"],
-    [class*="candidate"],
-    [class*="ranking"],
-    [class*="summary"],
-    [class*="skill"],
-    [class*="matched"],
-    [class*="missing"],
-    [class*="metric"],
-    [class*="score"],
-    .enterprise-card,
-    .streamlit-expanderHeader,
-    .streamlit-expanderContent {{
-        /* Container itself keeps its background - no change */
-    }}
-    
-    /* ALL nested elements in informational containers - FORCE transparent */
-    .stInfo *,
-    .stInfo > *,
-    .stInfo div,
-    .stInfo span,
-    .stInfo p,
-    .stInfo label,
-    .stSuccess *,
-    .stSuccess > *,
-    .stSuccess div,
-    .stSuccess span,
-    .stSuccess p,
-    .stSuccess label,
-    .stWarning *,
-    .stWarning > *,
-    .stWarning div,
-    .stWarning span,
-    .stWarning p,
-    .stWarning label,
-    .stError *,
-    .stError > *,
-    .stError div,
-    .stError span,
-    .stError p,
-    .stError label,
-    [data-testid="stMarkdownContainer"] *,
-    [data-testid="stMarkdownContainer"] > *,
-    [data-testid="stMarkdownContainer"] div,
-    [data-testid="stMarkdownContainer"] span,
-    [data-testid="stMarkdownContainer"] p,
-    [data-testid="stVerticalBlock"] *,
-    [data-testid="stHorizontalBlock"] *,
-    [class*="result"] *,
-    [class*="candidate"] *,
-    [class*="ranking"] *,
-    [class*="summary"] *,
-    [class*="skill"] *,
-    [class*="matched"] *,
-    [class*="missing"] *,
-    .enterprise-card *,
-    .enterprise-card > *,
-    .enterprise-card div,
-    .enterprise-card span,
-    .enterprise-card p,
-    .enterprise-card label,
-    .streamlit-expanderHeader *,
-    .streamlit-expanderHeader > *,
-    .streamlit-expanderHeader div,
-    .streamlit-expanderHeader span,
-    .streamlit-expanderHeader p,
-    .streamlit-expanderHeader label,
-    .streamlit-expanderContent *,
-    .streamlit-expanderContent > *,
-    .streamlit-expanderContent div,
-    .streamlit-expanderContent span,
-    .streamlit-expanderContent p,
-    .streamlit-expanderContent label {{
-        background-color: transparent !important;
-        background: transparent !important;
-        border: none !important;
-        box-shadow: none !important;
-        -webkit-box-shadow: none !important;
-    }}
-    
-    /* EXCLUDE: JD Type radio selector - must keep active background for selected state */
-    .stRadio [role="radiogroup"][aria-orientation="horizontal"],
-    .stRadio [role="radiogroup"][aria-orientation="horizontal"] *,
-    .stRadio [role="radiogroup"][aria-orientation="horizontal"] > *,
-    .stRadio [role="radiogroup"][aria-orientation="horizontal"] div,
-    .stRadio [role="radiogroup"][aria-orientation="horizontal"] span,
-    .stRadio [role="radiogroup"][aria-orientation="horizontal"] label,
-    .stRadio [role="radiogroup"][aria-orientation="horizontal"] input[type="radio"],
-    .stRadio [role="radiogroup"][aria-orientation="horizontal"] input[type="radio"]:checked + label {{
-        background-color: revert !important;
-        background: revert !important;
-        border: revert !important;
-        box-shadow: revert !important;
-        -webkit-box-shadow: revert !important;
-    }}
-    
-    /* EXCLUDE: Streamlit input components - they MUST keep their input styling */
-    .stInfo .stTextInput,
-    .stInfo .stTextInput *,
-    .stInfo .stTextArea,
-    .stInfo .stTextArea *,
-    .stInfo .stSelectbox,
-    .stInfo .stSelectbox *,
-    .stInfo .stMultiSelect,
-    .stInfo .stMultiSelect *,
-    .stInfo .stNumberInput,
-    .stInfo .stNumberInput *,
-    .stInfo [data-testid="stFileUploader"],
-    .stInfo [data-testid="stFileUploader"] *,
-    .stSuccess .stTextInput,
-    .stSuccess .stTextInput *,
-    .stSuccess .stTextArea,
-    .stSuccess .stTextArea *,
-    .stSuccess .stSelectbox,
-    .stSuccess .stSelectbox *,
-    .stSuccess .stMultiSelect,
-    .stSuccess .stMultiSelect *,
-    .stSuccess .stNumberInput,
-    .stSuccess .stNumberInput *,
-    .stSuccess [data-testid="stFileUploader"],
-    .stSuccess [data-testid="stFileUploader"] *,
-    .stWarning .stTextInput,
-    .stWarning .stTextInput *,
-    .stWarning .stTextArea,
-    .stWarning .stTextArea *,
-    .stWarning .stSelectbox,
-    .stWarning .stSelectbox *,
-    .stWarning .stMultiSelect,
-    .stWarning .stMultiSelect *,
-    .stWarning .stNumberInput,
-    .stWarning .stNumberInput *,
-    .stWarning [data-testid="stFileUploader"],
-    .stWarning [data-testid="stFileUploader"] *,
-    .stError .stTextInput,
-    .stError .stTextInput *,
-    .stError .stTextArea,
-    .stError .stTextArea *,
-    .stError .stSelectbox,
-    .stError .stSelectbox *,
-    .stError .stMultiSelect,
-    .stError .stMultiSelect *,
-    .stError .stNumberInput,
-    .stError .stNumberInput *,
-    .stError [data-testid="stFileUploader"],
-    .stError [data-testid="stFileUploader"] *,
-    [data-testid="stMarkdownContainer"] .stTextInput,
-    [data-testid="stMarkdownContainer"] .stTextInput *,
-    [data-testid="stMarkdownContainer"] .stTextArea,
-    [data-testid="stMarkdownContainer"] .stTextArea *,
-    [data-testid="stMarkdownContainer"] .stSelectbox,
-    [data-testid="stMarkdownContainer"] .stSelectbox *,
-    [data-testid="stMarkdownContainer"] .stMultiSelect,
-    [data-testid="stMarkdownContainer"] .stMultiSelect *,
-    [data-testid="stMarkdownContainer"] .stNumberInput,
-    [data-testid="stMarkdownContainer"] .stNumberInput *,
-    [data-testid="stMarkdownContainer"] [data-testid="stFileUploader"],
-    [data-testid="stMarkdownContainer"] [data-testid="stFileUploader"] *,
-    .enterprise-card .stTextInput,
-    .enterprise-card .stTextInput *,
-    .enterprise-card .stTextArea,
-    .enterprise-card .stTextArea *,
-    .enterprise-card .stSelectbox,
-    .enterprise-card .stSelectbox *,
-    .enterprise-card .stMultiSelect,
-    .enterprise-card .stMultiSelect *,
-    .enterprise-card .stNumberInput,
-    .enterprise-card .stNumberInput *,
-    .enterprise-card [data-testid="stFileUploader"],
-    .enterprise-card [data-testid="stFileUploader"] *,
-    .streamlit-expanderContent .stTextInput,
-    .streamlit-expanderContent .stTextInput *,
-    .streamlit-expanderContent .stTextArea,
-    .streamlit-expanderContent .stTextArea *,
-    .streamlit-expanderContent .stSelectbox,
-    .streamlit-expanderContent .stSelectbox *,
-    .streamlit-expanderContent .stMultiSelect,
-    .streamlit-expanderContent .stMultiSelect *,
-    .streamlit-expanderContent .stNumberInput,
-    .streamlit-expanderContent .stNumberInput *,
-    .streamlit-expanderContent [data-testid="stFileUploader"],
-    .streamlit-expanderContent [data-testid="stFileUploader"] * {{
-        background-color: {colors["input_bg"]} !important;
-        border: 1px solid {colors["input_border"]} !important;
-    }}
-    
-    /* EXCLUDE: Buttons - they have their own styling */
-    .stInfo [data-testid="stButton"] > button,
-    .stSuccess [data-testid="stButton"] > button,
-    .stWarning [data-testid="stButton"] > button,
-    .stError [data-testid="stButton"] > button,
-    [data-testid="stMarkdownContainer"] [data-testid="stButton"] > button,
-    [class*="result"] [data-testid="stButton"] > button,
-    .enterprise-card [data-testid="stButton"] > button,
-    .streamlit-expanderContent [data-testid="stButton"] > button,
-    .stInfo [data-testid="stDownloadButton"] > button,
-    .stSuccess [data-testid="stDownloadButton"] > button,
-    .stWarning [data-testid="stDownloadButton"] > button,
-    .stError [data-testid="stDownloadButton"] > button,
-    [data-testid="stMarkdownContainer"] [data-testid="stDownloadButton"] > button,
-    [class*="result"] [data-testid="stDownloadButton"] > button,
-    .enterprise-card [data-testid="stDownloadButton"] > button,
-    .streamlit-expanderContent [data-testid="stDownloadButton"] > button {{
-        background-color: {colors["accent"]} !important;
-    }}
-    
-    /* Dark backgrounds - white text for readability */
-    [style*="background"][style*="#0f"],
-    [style*="background"][style*="#1a"],
-    [style*="background"][style*="#1e"],
-    [style*="background-color"][style*="#0f"],
-    [style*="background-color"][style*="#1a"],
-    [style*="background-color"][style*="#1e"],
-    [style*="background: #0f"],
-    [style*="background: #1a"],
-    [style*="background: #1e"],
-    [style*="background-color: #0f"],
-    [style*="background-color: #1a"],
-    [style*="background-color: #1e"] {{
-        color: white !important;
-    }}
-    
-    [style*="background"][style*="#0f"] *,
-    [style*="background"][style*="#1a"] *,
-    [style*="background"][style*="#1e"] *,
-    [style*="background-color"][style*="#0f"] *,
-    [style*="background-color"][style*="#1a"] *,
-    [style*="background-color"][style*="#1e"] *,
-    [style*="background: #0f"] *,
-    [style*="background: #1a"] *,
-    [style*="background: #1e"] *,
-    [style*="background-color: #0f"] *,
-    [style*="background-color: #1a"] *,
-    [style*="background-color: #1e"] * {{
-        color: white !important;
-        background-color: transparent !important;
-    }}
-    """
-    
-    # Light-mode-only fixes for dark sections with invisible text
-    light_mode_dark_section_fixes = ""
-    if theme == "light":
-        light_mode_dark_section_fixes = f"""
-    /* ============================================
-       LIGHT MODE: Fix text visibility in dark sections
-       (ONLY text color, NO background changes)
-       ============================================ */
-    
-    /* Dark/black result cards and sections - white text only */
-    [style*="background"][style*="#0f"],
-    [style*="background"][style*="#1a"],
-    [style*="background"][style*="#1e"],
-    [style*="background"][style*="rgb(15"],
-    [style*="background"][style*="rgb(26"],
-    [style*="background"][style*="rgb(30"],
-    [style*="background-color"][style*="#0f"],
-    [style*="background-color"][style*="#1a"],
-    [style*="background-color"][style*="#1e"],
-    [style*="background-color"][style*="rgb(15"],
-    [style*="background-color"][style*="rgb(26"],
-    [style*="background-color"][style*="rgb(30"],
-    [style*="background: #0f"],
-    [style*="background: #1a"],
-    [style*="background: #1e"],
-    [style*="background-color: #0f"],
-    [style*="background-color: #1a"],
-    [style*="background-color: #1e"] {{
-        color: white !important;
-    }}
-    
-    [style*="background"][style*="#0f"] *,
-    [style*="background"][style*="#1a"] *,
-    [style*="background"][style*="#1e"] *,
-    [style*="background-color"][style*="#0f"] *,
-    [style*="background-color"][style*="#1a"] *,
-    [style*="background-color"][style*="#1e"] * {{
-        color: white !important;
-    }}
-    
-    /* Expandable candidate sections with dark backgrounds */
-    .streamlit-expanderHeader[style*="background"][style*="#0f"],
-    .streamlit-expanderHeader[style*="background"][style*="#1a"],
-    .streamlit-expanderHeader[style*="background"][style*="#1e"],
-    .streamlit-expanderContent[style*="background"][style*="#0f"],
-    .streamlit-expanderContent[style*="background"][style*="#1a"],
-    .streamlit-expanderContent[style*="background"][style*="#1e"] {{
-        color: white !important;
-    }}
-    
-    .streamlit-expanderHeader[style*="background"][style*="#0f"] *,
-    .streamlit-expanderHeader[style*="background"][style*="#1a"] *,
-    .streamlit-expanderHeader[style*="background"][style*="#1e"] *,
-    .streamlit-expanderContent[style*="background"][style*="#0f"] *,
-    .streamlit-expanderContent[style*="background"][style*="#1a"] *,
-    .streamlit-expanderContent[style*="background"][style*="#1e"] * {{
-        color: white !important;
-    }}
-    
-    /* Score containers with dark backgrounds */
-    [class*="score"][style*="background"][style*="#0f"],
-    [class*="score"][style*="background"][style*="#1a"],
-    [class*="score"][style*="background"][style*="#1e"],
-    p[class*="score"][style*="background"][style*="#0f"],
-    p[class*="score"][style*="background"][style*="#1a"],
-    p[class*="score"][style*="background"][style*="#1e"] {{
-        color: white !important;
-    }}
-    
-    [class*="score"][style*="background"][style*="#0f"] *,
-    [class*="score"][style*="background"][style*="#1a"] *,
-    [class*="score"][style*="background"][style*="#1e"] * {{
-        color: white !important;
-    }}
-    
-    /* Selection sliders and controls with dark backgrounds */
-    .stSlider [style*="background"][style*="#0f"],
-    .stSlider [style*="background"][style*="#1a"],
-    .stSlider [style*="background"][style*="#1e"] {{
-        color: white !important;
-    }}
-    
-    .stSlider [style*="background"][style*="#0f"] *,
-    .stSlider [style*="background"][style*="#1a"] *,
-    .stSlider [style*="background"][style*="#1e"] * {{
-        color: white !important;
-    }}
-    
-    /* Buttons with dark backgrounds - text only */
-    .stButton > button[style*="background"][style*="#0f"],
-    .stButton > button[style*="background"][style*="#1a"],
-    .stButton > button[style*="background"][style*="#1e"],
-    [data-testid="stDownloadButton"] > button[style*="background"][style*="#0f"],
-    [data-testid="stDownloadButton"] > button[style*="background"][style*="#1a"],
-    [data-testid="stDownloadButton"] > button[style*="background"][style*="#1e"] {{
-        color: white !important;
-    }}
-    
-    .stButton > button[style*="background"][style*="#0f"] *,
-    .stButton > button[style*="background"][style*="#1a"] *,
-    .stButton > button[style*="background"][style*="#1e"] * {{
-        color: white !important;
-    }}
-    
-    /* Selected Skills display - no white background, only text fix if needed */
-    [class*="skill"][style*="background"][style*="#0f"],
-    [class*="skill"][style*="background"][style*="#1a"],
-    [class*="skill"][style*="background"][style*="#1e"] {{
-        color: white !important;
-    }}
-    
-    [class*="skill"][style*="background"][style*="#0f"] *,
-    [class*="skill"][style*="background"][style*="#1a"] *,
-    [class*="skill"][style*="background"][style*="#1e"] * {{
-        color: white !important;
-    }}
-    """
     
     return f"""
 <style>
@@ -1073,124 +728,6 @@ def get_theme_css(theme: str) -> str:
         color: {colors["dataframe_text"]} !important;
     }}
     
-    /* Radio buttons - base container */
-    .stRadio > div {{
-        background-color: {colors["radio_bg"]} !important;
-        padding: 0.35rem;
-        border-radius: 9999px;
-        border: 1px solid {colors["radio_border"]} !important;
-        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    }}
-
-    /* Horizontal JD Type radio group as segmented control */
-    .stRadio [role="radiogroup"][aria-orientation="horizontal"] {{
-        display: inline-flex !important;
-        gap: 0;
-        border-radius: 9999px;
-        overflow: hidden;
-    }}
-    
-    /* Radio button options container */
-    .stRadio > div > div,
-    .stRadio > div > div > div,
-    .stRadio [role="radiogroup"][aria-orientation="horizontal"] > div {{
-        background-color: transparent !important;
-        border: none !important;
-    }}
-    
-    /* Radio button option items (segments) - base styling */
-    .stRadio [role="radiogroup"][aria-orientation="horizontal"] label {{
-        color: {colors["text_primary"]} !important;
-        background-color: transparent !important;
-        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-        font-weight: 400;
-        padding: 0.4rem 1rem;
-        padding-left: 0.4rem;
-        border-radius: 9999px;
-        transition: all 0.2s ease;
-        cursor: pointer;
-        display: inline-flex;
-        align-items: center;
-        justify-content: flex-start;
-        white-space: nowrap;
-        min-width: fit-content;
-    }}
-    
-    /* Radio button option hover state - only for unselected */
-    .stRadio [role="radiogroup"][aria-orientation="horizontal"] input[type="radio"]:not(:checked) + label:hover {{
-        background-color: {colors["surface"]} !important;
-        opacity: 1;
-    }}
-    
-    /* Selected option should not change on hover */
-    .stRadio [role="radiogroup"][aria-orientation="horizontal"] input[type="radio"]:checked + label:hover {{
-        background-color: {colors["accent"]} !important;
-        color: white !important;
-    }}
-    
-    /* Show and style radio dots - clearly visible in Light Mode */
-    .stRadio [role="radiogroup"][aria-orientation="horizontal"] input[type="radio"] {{
-        position: relative !important;
-        opacity: 1 !important;
-        width: 18px !important;
-        height: 18px !important;
-        margin: 0 0.5rem 0 0 !important;
-        padding: 0 !important;
-        cursor: pointer;
-        accent-color: {colors["accent"]} !important;
-        -webkit-appearance: radio;
-        appearance: radio;
-    }}
-    
-    /* Radio dot - checked state - clearly visible colored dot */
-    .stRadio [role="radiogroup"][aria-orientation="horizontal"] input[type="radio"]:checked {{
-        accent-color: {colors["accent"]} !important;
-        border-color: {colors["accent"]} !important;
-    }}
-    
-    /* Ensure radio dot is visible with accent color */
-    .stRadio [role="radiogroup"][aria-orientation="horizontal"] input[type="radio"]:checked::before {{
-        content: "";
-        display: block;
-        width: 10px;
-        height: 10px;
-        border-radius: 50%;
-        background-color: {colors["accent"]} !important;
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-    }}
-    
-    /* Selected segment state - VERY CLEAR in Light Mode */
-    .stRadio [role="radiogroup"][aria-orientation="horizontal"] input[type="radio"]:checked + label,
-    .stRadio [role="radiogroup"][aria-orientation="horizontal"] input[type="radio"]:checked ~ label,
-    .stRadio [role="radiogroup"][aria-orientation="horizontal"] label[for*="jd_mode"]:has(+ input[type="radio"]:checked),
-    .stRadio [role="radiogroup"][aria-orientation="horizontal"] > div > div:has(input[type="radio"]:checked) label {{
-        background-color: {colors["accent"]} !important;
-        color: white !important;
-        font-weight: 700 !important;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
-    }}
-    
-    /* Unselected segments - clearly inactive */
-    .stRadio [role="radiogroup"][aria-orientation="horizontal"] input[type="radio"]:not(:checked) + label,
-    .stRadio [role="radiogroup"][aria-orientation="horizontal"] input[type="radio"]:not(:checked) ~ label,
-    .stRadio [role="radiogroup"][aria-orientation="horizontal"] > div > div:not(:has(input[type="radio"]:checked)) label {{
-        background-color: transparent !important;
-        color: {colors["text_secondary"]} !important;
-        font-weight: 400 !important;
-        opacity: 0.7;
-    }}
-    
-    /* Ensure selected state is always visible - additional selectors */
-    .stRadio [role="radiogroup"][aria-orientation="horizontal"] input[type="radio"][checked] + label,
-    .stRadio [role="radiogroup"][aria-orientation="horizontal"] [aria-checked="true"] + label {{
-        background-color: {colors["accent"]} !important;
-        color: white !important;
-        font-weight: 700 !important;
-    }}
-    
     /* File uploader - professional styling */
     [data-testid="stFileUploader"] {{
         background-color: {colors["uploader_bg"]} !important;
@@ -1383,7 +920,7 @@ def get_theme_css(theme: str) -> str:
         background-color: transparent !important;
         color: white !important;
     }}
-    
+
     /* ============================================
        DROPDOWN OPTIONS MENU
        ============================================ */
@@ -1452,21 +989,12 @@ def get_theme_css(theme: str) -> str:
         color: white !important;
     }}
     
-    /* ============================================
-       SIDEBAR ICONS AND ARROWS
-       ============================================ */
-    
-    /* Sidebar icons */
-    [data-testid="stSidebar"] svg,
-    [data-testid="stSidebar"] [class*="icon"],
-    [data-testid="stSidebar"] [class*="arrow"],
-    [data-testid="stSidebar"] .streamlit-expanderHeader svg,
-    [data-testid="stSidebar"] [data-testid="stExpanderToggleIcon"] {{
-        fill: {colors["icon_color"]} !important;
-        color: {colors["icon_color"]} !important;
-        opacity: 1 !important;
-        stroke: {colors["icon_color"]} !important;
-    }}
+    section[data-testid="stSidebar"] {{
+    background-color: #f1f5f9 !important;
+    border-right: 1px solid #e5e7eb !important;
+    box-shadow: 4px 0 12px rgba(0, 0, 0, 0.06) !important;
+   }}
+
     
     /* Sidebar text */
     [data-testid="stSidebar"] p,
@@ -1511,8 +1039,6 @@ def get_theme_css(theme: str) -> str:
         background-color: {colors["accent"]} !important;
         color: white !important;
     }}
-    
-    /* Radio button labels - consolidated with main radio styling above */
     
     /* Number input */
     .stNumberInput > div > div > input {{
@@ -1675,9 +1201,97 @@ def get_theme_css(theme: str) -> str:
         }}
     }}
     
-    {light_mode_global_fix}
+    {'''
+    /* ============================================
+       LIGHT MODE ONLY FIXES
+       ============================================ */
     
-    {light_mode_dark_section_fixes}
+    /* TASK 1: Fix 'Other Ranked Candidates' header bar (Light Mode Only) */
+    /* Target the container with toggle button */
+    [data-testid="stVerticalBlock"]:has(button[key*="toggle_other_candidates"]),
+    [data-testid="stHorizontalBlock"]:has(button[key*="toggle_other_candidates"]) {
+        background-color: #F9FAFB !important;
+        border: 1px solid #E5E7EB !important;
+        border-radius: 6px;
+        padding: 1rem;
+    }
+    
+    [data-testid="stVerticalBlock"]:has(button[key*="toggle_other_candidates"]) *,
+    [data-testid="stHorizontalBlock"]:has(button[key*="toggle_other_candidates"]) *,
+    [data-testid="stVerticalBlock"]:has(button[key*="toggle_other_candidates"]) h3,
+    [data-testid="stHorizontalBlock"]:has(button[key*="toggle_other_candidates"]) h3 {
+        color: #111827 !important;
+    }
+    
+    /* Icons in Other Ranked Candidates section */
+    button[key*="toggle_other_candidates"] svg,
+    [data-testid="stVerticalBlock"]:has(button[key*="toggle_other_candidates"]) svg,
+    [data-testid="stHorizontalBlock"]:has(button[key*="toggle_other_candidates"]) svg {
+        fill: #374151 !important;
+        color: #374151 !important;
+        stroke: #374151 !important;
+    }
+    
+    /* TASK 2: Fix Matched Skills / Missing Skills boxes (Light Mode Only) */
+    /* Outlined cards for st.info and st.warning in results section */
+    [data-testid="stExpander"] .stInfo,
+    [data-testid="stExpander"] .stWarning {
+        background-color: #FFFFFF !important;
+        border-radius: 6px;
+        padding: 1rem;
+        color: #111827 !important;
+    }
+    
+    [data-testid="stExpander"] .stInfo {
+        border: 1px solid #2563EB !important;
+        border-left: 1px solid #2563EB !important;
+    }
+    
+    [data-testid="stExpander"] .stWarning {
+        border: 1px solid #F59E0B !important;
+        border-left: 1px solid #F59E0B !important;
+    }
+    
+    [data-testid="stExpander"] .stInfo *,
+    [data-testid="stExpander"] .stWarning * {
+        background-color: transparent !important;
+        color: #111827 !important;
+    }
+    
+    
+    
+    /* TASK 4: Fix Candidate expander headers (Light Mode Only) */
+    /* Candidate result expander headers - light background */
+    /* Target expanders that contain candidate info (not sidebar expanders) */
+    [data-testid="stExpander"]:not([data-testid="stSidebar"] [data-testid="stExpander"]) .streamlit-expanderHeader {
+        background-color: #FFFFFF !important;
+        border: 1px solid #E5E7EB !important;
+        color: #111827 !important;
+        border-radius: 6px;
+        padding: 1rem;
+        font-weight: 600;
+    }
+    
+    [data-testid="stExpander"]:not([data-testid="stSidebar"] [data-testid="stExpander"]) .streamlit-expanderHeader * {
+        background-color: transparent !important;
+        color: #111827 !important;
+    }
+    
+    /* Candidate expander chevron icon */
+    [data-testid="stExpander"]:not([data-testid="stSidebar"] [data-testid="stExpander"]) .streamlit-expanderHeader svg,
+    [data-testid="stExpander"]:not([data-testid="stSidebar"] [data-testid="stExpander"]) [data-testid="stExpanderToggleIcon"] {
+        fill: #374151 !important;
+        color: #374151 !important;
+        stroke: #374151 !important;
+    }
+
+    /* Fix light mode icon (sun) */
+section[data-testid="stSidebar"] img {
+    background: transparent !important;
+    border-radius: 8px !important;
+}
+
+    ''' if theme == "light" else ""}
 </style>
 """
 
@@ -1686,8 +1300,989 @@ def get_theme_css(theme: str) -> str:
 current_css = get_theme_css(st.session_state.theme)
 st.markdown(current_css, unsafe_allow_html=True)
 
+
+if st.session_state.theme == "light":
+    st.markdown("""
+    <style>
+
+    /* ===============================
+       1. SIDEBAR OPEN / CLOSE ARROW
+       =============================== */
+
+    /* OPEN sidebar button (>>) */
+    button[data-testid="collapsedControl"] {
+        background: #ffffff !important;
+        border: none !important;
+        box-shadow: none !important;
+    }
+
+    
+
+    /* CLOSE sidebar button (<<) */
+    button[data-testid="stSidebarCollapseButton"] svg,
+    button[data-testid="stSidebarCollapseButton"] svg path {
+        fill: #111827 !important;
+        stroke: #111827 !important;
+        opacity: 1 !important;
+    }
+
+    /* ===============================
+       2. OTHER RANKED CANDIDATES TABLE
+       =============================== */
+
+    /* Table wrapper */
+    [data-testid="stDataFrame"] {
+        background-color: #ffffff !important;
+        border: 1px solid #e5e7eb !important;
+        border-radius: 8px !important;
+    }
+
+    /* Header */
+    [data-testid="stDataFrame"] thead th {
+        background-color: #f9fafb !important;
+        color: #111827 !important;
+        border-bottom: 1px solid #e5e7eb !important;
+    }
+
+    /* Rows */
+    [data-testid="stDataFrame"] tbody td {
+        background-color: #ffffff !important;
+        color: #111827 !important;
+        border-bottom: 1px solid #e5e7eb !important;
+    }
+
+    /* Kill dark BaseWeb layers */
+    [data-testid="stDataFrame"] * {
+        background-color: transparent !important;
+        color: #111827 !important;
+    }
+
+    /* Hover */
+    [data-testid="stDataFrame"] tbody tr:hover td {
+        background-color: #f3f4f6 !important;
+    }
+
+    
+
+
+
+/* =========================================
+   LIGHT MODE – DATAFRAME FULLSCREEN (MODAL)
+   ========================================= */
+
+/* Fullscreen modal background */
+[data-baseweb="modal"] {
+    background-color: rgba(255, 255, 255, 0.98) !important;
+}
+
+/* Modal content wrapper */
+[data-baseweb="modal"] [data-testid="stDataFrame"] {
+    background-color: #ffffff !important;
+    border-radius: 8px !important;
+}
+
+/* Table header in fullscreen */
+[data-baseweb="modal"] thead tr th {
+    background-color: #f9fafb !important;
+    color: #111827 !important;
+    border-bottom: 1px solid #e5e7eb !important;
+}
+
+/* Table rows in fullscreen */
+[data-baseweb="modal"] tbody tr td {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+    border-bottom: 1px solid #e5e7eb !important;
+}
+
+/* Remove dark base layers */
+[data-baseweb="modal"] * {
+    background-color: transparent !important;
+    color: #111827 !important;
+}
+
+/* Hover effect */
+[data-baseweb="modal"] tbody tr:hover td {
+    background-color: #f3f4f6 !important;
+}
+
+/* =========================================
+   LIGHT MODE – SIDEBAR TOGGLE ARROW VISIBILITY
+   ========================================= */
+
+/* Sidebar toggle button container */
+button[data-testid="collapsedControl"] {
+    background-color: #ffffff !important;
+    border: 1px solid #e5e7eb !important;
+    border-radius: 8px !important;
+}
+
+/* Arrow icon (OPEN sidebar >>) */
+button[data-testid="collapsedControl"] svg {
+    fill: #111827 !important;      /* dark icon */
+    color: #111827 !important;
+    opacity: 1 !important;
+}
+
+/* Hover state */
+button[data-testid="collapsedControl"]:hover {
+    background-color: #f9fafb !important;
+}
+
+
+
+/* =========================================
+   LIGHT MODE – SIDEBAR OPEN (>>) BUTTON FIX
+   ========================================= */
+
+/* Floating sidebar open button */
+button[data-testid="collapsedControl"] {
+    background-color: #ffffff !important;
+    border: 1px solid #d1d5db !important;
+    border-radius: 8px !important;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08) !important;
+    opacity: 1 !important;
+}
+
+/* Arrow icon inside the button */
+button[data-testid="collapsedControl"] svg {
+    fill: #111827 !important;
+    stroke: #111827 !important;
+    color: #111827 !important;
+    opacity: 1 !important;
+}
+
+/* Hover state */
+button[data-testid="collapsedControl"]:hover {
+    background-color: #f9fafb !important;
+}
+
+
+/* =========================================
+   LIGHT MODE – SIDEBAR VISUAL SEPARATION
+   ========================================= */
+
+/* Sidebar background */
+section[data-testid="stSidebar"] {
+    background-color: #f8fafc !important;   /* slightly off-white */
+    border-right: 1px solid #e5e7eb !important;
+}
+
+/* Inner sidebar content */
+section[data-testid="stSidebar"] > div {
+    background-color: #f8fafc !important;
+}
+
+/* Add subtle depth so it doesn't merge */
+section[data-testid="stSidebar"] {
+    box-shadow: 2px 0 6px rgba(0, 0, 0, 0.04) !important;
+}
+
+/* Sidebar text */
+section[data-testid="stSidebar"] * {
+    color: #111827 !important;
+}
+
+/* Sidebar buttons/cards */
+section[data-testid="stSidebar"] button,
+section[data-testid="stSidebar"] [role="button"] {
+    background-color: #ffffff !important;
+    border: 1px solid #e5e7eb !important;
+}
+
+
+    /* ===============================
+       FIX EXPANDER HEADER – LIGHT MODE
+       =============================== */
+
+    [data-testid="stExpander"] summary {
+        background-color: #ffffff !important;
+        color: #111827 !important;
+        border: 1px solid #e5e7eb !important;
+        border-radius: 6px !important;
+        padding: 12px 16px !important;
+        font-weight: 600 !important;
+    }
+
+    /* Remove dark inner bars */
+    [data-testid="stExpander"] summary * {
+        background: transparent !important;
+        color: #111827 !important;
+    }
+
+    /* Arrow icon */
+    [data-testid="stExpander"] svg {
+        fill: #374151 !important;
+        color: #374151 !important;
+    }
+
+    /* Hover */
+    [data-testid="stExpander"] summary:hover {
+        background-color: #f9fafb !important;
+    }
+
+    /* ===============================
+       FIX OTHER RANKED CANDIDATES TABLE
+       =============================== */
+
+    section[data-testid="stDataFrame"] {
+        background-color: #ffffff !important;
+        border: 1px solid #e5e7eb !important;
+        border-radius: 8px !important;
+    }
+
+    section[data-testid="stDataFrame"] * {
+        color: #111827 !important;
+        background-color: transparent !important;
+    }
+
+
+    /* ========= SIDEBAR BACKGROUND ========= */
+    section[data-testid="stSidebar"] {
+        background-color: #f8fafc !important;
+        border-right: 1px solid #e5e7eb !important;
+        box-shadow: 2px 0 6px rgba(0,0,0,0.05) !important;
+    }
+
+  
+# =====================================================
+# LIGHT MODE – FIX ALL INFO / WARNING INNER WHITE BOXES
+# =====================================================
+
+
+    /* ================================
+       BASE ALERT CONTAINERS
+       ================================ */
+    .stAlert {
+        border-radius: 8px !important;
+        box-shadow: none !important;
+    }
+
+    /* Selected / Matched Skills (Info) */
+    .stAlert.stInfo {
+        background-color: #dbeafe !important;  /* light blue */
+        border: none !important;
+    }
+
+    /* Missing Skills (Warning) */
+    .stAlert.stWarning {
+        background-color: #fef3c7 !important;  /* light yellow */
+        border: 1px solid #f59e0b !important;
+    }
+
+     /* =========================================
+       4. TEXT CURSOR / CARET VISIBILITY
+       ========================================= */
+    
+    /* Text input caret */
+    .stTextInput input,
+    .stTextInput input[type="text"],
+    .stTextInput input[type="password"],
+    .stTextArea textarea {
+        caret-color: #000000 !important;
+    }
+    
+    /* Number input caret */
+    .stNumberInput input,
+    .stNumberInput input[type="number"] {
+        caret-color: #000000 !important;
+    }
+    
+    /* Chat input caret (if exists) */
+    .stChatInput input,
+    .stChatInput textarea {
+        caret-color: #000000 !important;
+    }
+    
+    /* Expander content inputs */
+    [data-testid="stExpander"] .stTextInput input,
+    [data-testid="stExpander"] .stTextArea textarea {
+        caret-color: #000000 !important;
+    }
+
+    
+
+    /* ================================
+       REMOVE ALL INNER WHITE LAYERS
+       ================================ */
+    .stAlert > div,
+    .stAlert > div > div,
+    .stAlert > div > div > div,
+    .stAlert .stMarkdown,
+    .stAlert .stMarkdownContainer {
+        background-color: transparent !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        box-shadow: none !important;
+    }
+
+    /* ================================
+       TEXT VISIBILITY
+       ================================ */
+    .stAlert p,
+    .stAlert span,
+    .stAlert div {
+        background: transparent !important;
+        color: #111827 !important;
+    }
+
+   
+
+    /* =====================================================
+       LIGHT MODE FIXES REMOVE DARK BASEWEB LAYERS
+       ===================================================== */
+    
+    /* Candidate expander headers (normal + hover) */
+    [data-testid="stExpander"] .streamlit-expanderHeader {
+        background-color: #ffffff !important;
+        color: #111827 !important;
+        border: 1px solid #e5e7eb !important;
+        border-radius: 6px !important;
+    }
+
+    [data-testid="stExpander"] .streamlit-expanderHeader > div {
+        background-color: transparent !important;
+    }
+
+    [data-testid="stExpander"] .streamlit-expanderHeader * {
+    background: transparent !important;
+    color: #111827 !important;
+    }
+
+    /* Number input box */
+    .stNumberInput input {
+        background-color: #ffffff !important;
+        color: #111827 !important;
+        border: 1px solid #d1d5db !important;
+    }
+
+    /* Number input + / - buttons */
+    .stNumberInput button,
+    .stNumberInput button * {
+        background-color: transparent !important;
+        color: #374151 !important;
+    }
+
+    /* “Showing additional candidates…” info text */
+    [data-testid="stMarkdownContainer"] p {
+        background-color: transparent !important;
+        color: #111827 !important;
+    }
+
+    /* Remove any remaining dark containers */
+    [data-testid="stVerticalBlock"],
+    [data-testid="stHorizontalBlock"] {
+        background-color: transparent !important;
+    }
+     
+    /* =====================================================
+   LIGHT MODE – FORCE REMOVE DARK BASEWEB CONTAINERS
+   ===================================================== */
+
+/* 1️⃣ Candidate expander outer header */
+[data-testid="stExpander"] .streamlit-expanderHeader {
+    background-color: #ffffff !important;
+    border: 1px solid #e5e7eb !important;
+    color: #111827 !important;
+}
+
+/* 2️⃣ REMOVE inner dark BaseWeb bar */
+[data-testid="stExpander"] .streamlit-expanderHeader > div,
+[data-testid="stExpander"] .streamlit-expanderHeader > div > div {
+    background-color: transparent !important;
+}
+
+/* 3️⃣ Text inside expander header */
+[data-testid="stExpander"] .streamlit-expanderHeader *,
+[data-testid="stExpander"] .streamlit-expanderHeader span {
+    color: #111827 !important;
+    background: transparent !important;
+}
+
+/* 4️⃣ Fix hover (prevent dark return) */
+[data-testid="stExpander"] .streamlit-expanderHeader:hover {
+    background-color: #f9fafb !important;
+}
+
+/* 5️⃣ “Showing additional candidates…” text block */
+[data-testid="stMarkdownContainer"] {
+    background-color: transparent !important;
+}
+
+[data-testid="stMarkdownContainer"] * {
+    color: #111827 !important;
+}
+
+/* 6️⃣ Remove any leftover dark ranking containers */
+[class*="ranking"],
+[class*="candidate"],
+[data-testid="stVerticalBlock"] > div {
+    background-color: transparent !important;
+}
+
+/* =====================================================
+   LIGHT MODE – FORCE OVERRIDE INLINE DARK BACKGROUNDS
+   ===================================================== */
+
+/* Candidate expander header – FORCE white */
+[data-testid="stExpander"] .streamlit-expanderHeader,
+[data-testid="stExpander"] .streamlit-expanderHeader[style],
+[data-testid="stExpander"] .streamlit-expanderHeader > div[style] {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+    border: 1px solid #e5e7eb !important;
+}
+
+/* Kill ALL inline dark backgrounds inside header */
+[data-testid="stExpander"] .streamlit-expanderHeader *[style*="background"] {
+    background-color: transparent !important;
+}
+
+/* Text inside header */
+[data-testid="stExpander"] .streamlit-expanderHeader *,
+[data-testid="stExpander"] .streamlit-expanderHeader span {
+    color: #111827 !important;
+}
+
+/* Prevent hover from being the only fix */
+[data-testid="stExpander"] .streamlit-expanderHeader:hover,
+[data-testid="stExpander"] .streamlit-expanderHeader:hover * {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+}
+
+/* Other Ranked Candidates header block */
+[data-testid="stVerticalBlock"] h3,
+[data-testid="stVerticalBlock"] h3 + div {
+    background-color: transparent !important;
+    color: #111827 !important;
+}
+
+/* =====================================================
+   FINAL FIX – BASEWEB EXPANDER BUTTON (BLACK BAR)
+   ===================================================== */
+
+/* Expander toggle button itself */
+button[data-testid="stExpanderToggle"] {
+    background-color: #f9fafb !important;
+    color: #111827 !important;
+    border: 1px solid #e5e7eb !important;
+    border-radius: 6px !important;
+}
+
+/* Inner BaseWeb container inside the button */
+button[data-testid="stExpanderToggle"] > div,
+button[data-testid="stExpanderToggle"] div[style] {
+    background-color: transparent !important;
+}
+
+/* Text inside expander button */
+button[data-testid="stExpanderToggle"] span,
+button[data-testid="stExpanderToggle"] p,
+button[data-testid="stExpanderToggle"] div {
+    color: #111827 !important;
+    background: transparent !important;
+}
+
+/* Prevent hover-only behavior */
+button[data-testid="stExpanderToggle"]:hover {
+    background-color: #f3f4f6 !important;
+}
+
+/* Chevron icon */
+button[data-testid="stExpanderToggle"] svg {
+    color: #374151 !important;
+    fill: #374151 !important;
+}
+
+.safe-expander summary {
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    padding: 12px 16px;
+    font-weight: 600;
+    color: #111827;
+    cursor: pointer;
+    list-style: none;
+}
+
+/* Arrow for safe expander */
+.safe-expander summary {
+    position: relative;
+    padding-left: 28px;
+}
+
+/* Arrow icon */
+.safe-expander summary::before {
+    content: "▸";
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 14px;
+    color: #374151;
+    transition: transform 0.2s ease;
+}
+
+/* Rotate arrow when open */
+.safe-expander details[open] summary::before {
+    transform: translateY(-50%) rotate(90deg);
+}
+
+
+.safe-expander summary::-webkit-details-marker {
+    display: none;
+}
+
+.safe-expander details {
+    margin-bottom: 1rem;
+}
+
+.safe-expander details[open] summary {
+    background: #f9fafb;
+}
+
+    </style>
+    """, unsafe_allow_html=True) 
+
+
+# ============================================
+# AUTHENTICATION PAGE FUNCTIONS
+# ============================================
+
+def get_auth_theme_css() -> str:
+    """Get CSS for authentication pages matching main app theme"""
+    colors = THEME_CONFIG.get(st.session_state.get("theme", "dark"), THEME_CONFIG["dark"])
+    
+    return f"""
+    <style>
+        /* Import professional font */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        
+        /* Main background */
+        .stApp {{
+            background: {colors["app_bg"]};
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }}
+
+        /* Headers */
+        h1, h2, h3 {{
+            color: {colors["text_primary"]} !important;
+            font-weight: 600;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }}
+        
+        /* Body text */
+        p, div, span {{
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            color: {colors["text_primary"]};
+        }}
+        
+        /* Labels */
+        label {{
+            color: {colors["text_primary"]} !important;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }}
+        
+        /* Text inputs */
+        .stTextInput > div > div > input {{
+            background-color: {colors["input_bg"]};
+            color: {colors["input_text"]};
+            border: 1px solid {colors["input_border"]};
+            border-radius: 6px;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }}
+        
+        /* Buttons */
+        .stButton > button {{
+            background: {colors["accent"]} !important;
+            color: white !important;
+            border: none;
+            border-radius: 6px;
+            padding: 0.75rem 2rem;
+            font-weight: 600;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }}
+        
+        .stButton > button:hover {{
+            background: {colors["accent_hover"]} !important;
+        }}
+    </style>
+    """
+
+
+def login_page():
+    """Login page"""
+    # Render global header with logos
+    render_global_header()
+    
+    # Hide sidebar completely
+    st.markdown(
+        '''
+        <style>
+            [data-testid="stSidebar"] { display: none; }
+            [data-testid="stSidebarNav"] { display: none; }
+        </style>
+        ''',
+        unsafe_allow_html=True
+    )
+    
+    # Apply auth theme CSS
+    auth_css = get_auth_theme_css()
+    st.markdown(auth_css, unsafe_allow_html=True)
+    
+    # Centered layout
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        st.markdown("<h1 style='text-align: center;'>HR AI Agent</h1>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align: center; color: #9aa0a6;'>Enterprise Talent Intelligence Platform</p>", unsafe_allow_html=True)
+        st.markdown("---")
+        
+        with st.form("login_form"):
+            st.markdown("### Sign In")
+            
+            email = st.text_input("Email", placeholder="your.email@company.com")
+            password = st.text_input("Password", type="password", placeholder="Enter your password")
+            
+            col_btn1, col_btn2 = st.columns(2)
+            with col_btn1:
+                login_button = st.form_submit_button("Login", use_container_width=True, type="primary")
+            with col_btn2:
+                forgot_button = st.form_submit_button("Forgot Password?", use_container_width=True)
+            
+            if forgot_button:
+                st.session_state.page = "forgot"
+                st.rerun()
+            
+            if login_button:
+                if not email or not password:
+                    st.error("Please enter both email and password")
+                else:
+                    try:
+                        response = requests.post(
+                            f"{API_BASE_URL}/auth/login",
+                            json={"email": email, "password": password},
+                            timeout=10
+                        )
+                        
+                        if response.status_code == 200:
+                            if not response.text or not response.text.strip():
+                                st.error("Login failed. Empty response from server.")
+                            else:
+                                try:
+                                    data = response.json()
+                                    if data.get("success"):
+                                        # Clear any query params (e.g., reset token)
+                                        try:
+                                            st.query_params.clear()
+                                        except Exception:
+                                            pass
+                                        st.session_state.authenticated = True
+                                        st.session_state.user_email = data.get("user_email", email)
+                                        st.session_state.page = "main"
+                                        st.session_state.reset_completed = False  # Clear reset flag
+                                        st.rerun()
+                                    else:
+                                        st.error("Invalid email or password")
+                                except Exception:
+                                    st.error("Login failed. Invalid server response.")
+                        else:
+                            st.error("Invalid email or password")
+                    except requests.exceptions.ConnectionError:
+                        st.error("Cannot connect to server. Please ensure the backend is running.")
+                    except requests.exceptions.Timeout:
+                        st.error("Request timed out. Please try again.")
+                    except Exception:
+                        st.error("Invalid email or password")
+        
+        st.markdown("---")
+        st.markdown("<p style='text-align: center;'>Don't have an account?</p>", unsafe_allow_html=True)
+        if st.button("Create Account", use_container_width=True):
+            st.session_state.page = "signup"
+            st.rerun()
+
+
+def signup_page():
+    """Signup page"""
+    # Render global header with logos
+    render_global_header()
+    
+    # Hide sidebar completely (but allow page navigation to show)
+    st.markdown(
+        '''
+        <style>
+            [data-testid="stSidebar"] { display: none; }
+        </style>
+        ''',
+        unsafe_allow_html=True
+    )
+    
+    # Apply auth theme CSS
+    auth_css = get_auth_theme_css()
+    st.markdown(auth_css, unsafe_allow_html=True)
+    
+    # Centered layout
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        st.markdown("<h1 style='text-align: center;'>Create Account</h1>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align: center; color: #9aa0a6;'>Join HR AI Agent Platform</p>", unsafe_allow_html=True)
+        st.markdown("---")
+        
+        with st.form("signup_form"):
+            st.markdown("### Register")
+            
+            col_name1, col_name2 = st.columns(2)
+            with col_name1:
+                first_name = st.text_input("First Name", placeholder="John")
+            with col_name2:
+                last_name = st.text_input("Last Name", placeholder="Doe")
+            
+            email = st.text_input("Email", placeholder="your.email@company.com")
+            password = st.text_input("Password", type="password", placeholder="At least 6 characters")
+            confirm_password = st.text_input("Confirm Password", type="password", placeholder="Re-enter password")
+            
+            create_button = st.form_submit_button("Create Account", use_container_width=True, type="primary")
+            
+            if create_button:
+                if not first_name or not last_name or not email:
+                    st.error("All fields are required")
+                elif password != confirm_password:
+                    st.error("Passwords do not match")
+                elif not password or len(password) < 6:
+                    st.error("Password must be at least 6 characters long")
+                else:
+                    try:
+                        response = requests.post(
+                            f"{API_BASE_URL}/auth/signup",
+                            json={
+                                "first_name": first_name,
+                                "last_name": last_name,
+                                "email": email,
+                                "password": password
+                            },
+                            timeout=10
+                        )
+                        
+                        if response.status_code == 200:
+                            if not response.text or not response.text.strip():
+                                st.success("Account created successfully. Please login.")
+                                st.session_state.page = "login"
+                                time.sleep(1)
+                                st.rerun()
+                            else:
+                                try:
+                                    data = response.json()
+                                    if data.get("success"):
+                                        st.success("Account created successfully! Redirecting to login...")
+                                        st.session_state.page = "login"
+                                        time.sleep(1)
+                                        st.rerun()
+                                    else:
+                                        st.error("Account creation failed. Email may already exist.")
+                                except Exception:
+                                    st.success("Account created successfully. Please login.")
+                                    st.session_state.page = "login"
+                                    time.sleep(1)
+                                    st.rerun()
+                        else:
+                            st.error("Account creation failed. Email may already exist.")
+                    except requests.exceptions.ConnectionError:
+                        st.error("Cannot connect to server. Please ensure the backend is running.")
+                    except requests.exceptions.Timeout:
+                        st.error("Request timed out. Please try again.")
+                    except Exception:
+                        st.error("Account creation failed. Please try again.")
+        
+        st.markdown("---")
+        st.markdown("<p style='text-align: center;'>Already have an account?</p>", unsafe_allow_html=True)
+        if st.button("Log in", use_container_width=True):
+            st.session_state.page = "login"
+            st.rerun()
+
+
+def forgot_password_page():
+    """Forgot password page"""
+    # Render global header with logos
+    render_global_header()
+    
+    # Hide sidebar completely (but allow page navigation to show)
+    st.markdown(
+        '''
+        <style>
+            [data-testid="stSidebar"] { display: none; }
+        </style>
+        ''',
+        unsafe_allow_html=True
+    )
+    
+    # Apply auth theme CSS
+    auth_css = get_auth_theme_css()
+    st.markdown(auth_css, unsafe_allow_html=True)
+    
+    # Centered layout
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        st.markdown("<h1 style='text-align: center;'>Forgot Password</h1>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align: center; color: #9aa0a6;'>Enter your email to receive a reset link</p>", unsafe_allow_html=True)
+        st.markdown("---")
+        
+        with st.form("forgot_password_form"):
+            st.markdown("### Request Password Reset")
+            
+            email = st.text_input("Email", placeholder="your.email@company.com")
+            
+            send_button = st.form_submit_button("Send Reset Link", use_container_width=True, type="primary")
+            
+            if send_button:
+                if not email:
+                    st.error("Please enter your email")
+                else:
+                    try:
+                        response = requests.post(
+                            f"{API_BASE_URL}/auth/forgot-password",
+                            json={"email": email},
+                            timeout=10
+                        )
+                        
+                        # Always show success message for security
+                        st.success("If the email exists, a password reset link has been sent.")
+                    except requests.exceptions.ConnectionError:
+                        st.error("Cannot connect to server. Please ensure the backend is running.")
+                    except requests.exceptions.Timeout:
+                        st.error("Request timed out. Please try again.")
+                    except Exception:
+                        st.success("If the email exists, a password reset link has been sent.")
+        
+        st.markdown("---")
+        if st.button("Back to Login", use_container_width=True):
+            st.session_state.page = "login"
+            st.rerun()
+
+
+def reset_password_page(token: str):
+    """Reset password page - accessed via token in URL"""
+    # Render global header with logos
+    render_global_header()
+    
+    # Hide sidebar completely
+    st.markdown(
+        '''
+        <style>
+            [data-testid="stSidebar"] { display: none; }
+            [data-testid="stSidebarNav"] { display: none; }
+        </style>
+        ''',
+        unsafe_allow_html=True
+    )
+    
+    # Apply auth theme CSS
+    auth_css = get_auth_theme_css()
+    st.markdown(auth_css, unsafe_allow_html=True)
+    
+    # Validate token format first
+    if not token or len(token) < 10:
+        st.error("Invalid or expired reset link")
+        st.markdown("---")
+        if st.button("Back to Login", use_container_width=True, key="back_to_login_invalid_token"):
+            try:
+                st.query_params.clear()
+            except Exception:
+                pass
+            st.session_state.page = "login"
+            st.rerun()
+        return
+    
+    # Centered layout
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        st.markdown("<h1 style='text-align: center;'>Reset Password</h1>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align: center; color: #9aa0a6;'>Enter your new password</p>", unsafe_allow_html=True)
+        st.markdown("---")
+        
+        # Token is present and valid format - show reset form
+        # Backend will validate token validity and expiry on submit
+        with st.form("reset_password_form"):
+            st.markdown("### Set New Password")
+            
+            new_password = st.text_input("New Password", type="password", placeholder="At least 6 characters")
+            confirm_password = st.text_input("Confirm New Password", type="password", placeholder="Re-enter password")
+            
+            reset_button = st.form_submit_button("Reset Password", use_container_width=True, type="primary")
+            
+            if reset_button:
+                # Frontend validation
+                if not new_password or len(new_password) < 6:
+                    st.error("Password must be at least 6 characters long")
+                elif new_password != confirm_password:
+                    st.error("Passwords do not match")
+                else:
+                    # Call backend API to validate token and reset password
+                    try:
+                        response = requests.post(
+                            f"{API_BASE_URL}/auth/reset-password",
+                            json={"token": token, "new_password": new_password},
+                            timeout=10
+                        )
+                        
+                        if response.status_code == 200:
+                            # Success - clear query params and redirect to login page
+                            try:
+                                st.query_params.clear()
+                            except Exception:
+                                pass
+                            st.session_state.authenticated = False
+                            st.session_state.page = "login"
+                            st.session_state.reset_completed = True
+                            st.success("Your password has been reset successfully. Redirecting to login...")
+                            st.rerun()
+                        else:
+                            # Token is invalid or expired - show error and redirect to login
+                            try:
+                                error_data = response.json()
+                                error_msg = error_data.get("detail", "Invalid or expired reset link")
+                            except Exception:
+                                error_msg = "Invalid or expired reset link"
+                            st.error(error_msg)
+                            st.markdown("---")
+                            if st.button("Back to Login", use_container_width=True, key="back_to_login_after_error"):
+                                try:
+                                    st.query_params.clear()
+                                except Exception:
+                                    pass
+                                st.session_state.page = "login"
+                                st.rerun()
+                                
+                    except requests.exceptions.ConnectionError:
+                        st.error("Cannot connect to server. Please ensure the backend is running.")
+                    except requests.exceptions.Timeout:
+                        st.error("Request timed out. Please try again.")
+                    except Exception:
+                        st.error("Invalid or expired reset link")
+                        st.markdown("---")
+                        if st.button("Back to Login", use_container_width=True, key="back_to_login_after_exception"):
+                            try:
+                                st.query_params.clear()
+                            except Exception:
+                                pass
+                            st.session_state.page = "login"
+                            st.rerun()
+        
+        st.markdown("---")
+        if st.button("Back to Login", use_container_width=True, key="back_to_login_reset"):
+            try:
+                st.query_params.clear()
+            except Exception:
+                pass
+            st.session_state.page = "login"
+            st.rerun()
+
 # API configuration (hardcoded, not exposed to users)
 API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000")
+
+
+
+
+
 
 
 def get_domain_skills(domain: str) -> List[str]:
@@ -1778,9 +2373,9 @@ def initialize_session():
     if "theme" not in st.session_state:
         st.session_state.theme = "dark"  # Default theme
 
+def render_global_header():
+    """Render global header with SIEI and EY logos - call this on ALL pages"""
 
-def display_header():
-    """Display enterprise header with institute and company branding"""
     # Logo paths
     siei_logo_path = "assets/siei_logo.png"
     SIEI_LOGO = Path(siei_logo_path)
@@ -1789,8 +2384,8 @@ def display_header():
     col_left, col_center, col_right = st.columns([3, 4, 3])
     
     with col_left:
-        # Push the whole left block slightly down
-        st.markdown("<div style='margin-top:16px;'></div>", unsafe_allow_html=True)
+
+        
         # Left: SIEI Branding - Logo image MUST be visible
         logo_text_col1, logo_text_col2 = st.columns([0.9, 3.1], gap="small")
         with logo_text_col1:
@@ -1859,6 +2454,9 @@ def display_header():
     """, unsafe_allow_html=True)
     
     with col_right:
+
+        
+
         # Right: EY Branding - Logo image using Base64 + HTML (theme-aware)
         ey_logo_path = get_ey_logo_path()
         
@@ -1870,7 +2468,6 @@ def display_header():
                     display:flex;
                     justify-content:flex-end;
                     align-items:flex-start;
-                    margin-top:16px;
                     margin-right:-32px;
                 ">
                     <img src="data:image/png;base64,{ey_base64}"
@@ -1889,6 +2486,11 @@ def display_header():
         else:
             # Do nothing if logo not found (NO BOX)
             st.markdown("")
+
+
+def display_header():
+    """Display enterprise header with institute and company branding (for main page)"""
+    render_global_header()
     
     # Main title at center - moved slightly upward
     theme_colors = get_theme()
@@ -1970,7 +2572,6 @@ def generate_job_description(
 The output MUST start with a header section in this exact order:
 
 Job Title: {job_title}
-Experience Required: {experience}
 Location: {location}
 
 After the header, include the following sections in order:
@@ -2043,6 +2644,15 @@ def rank_cvs(jd_text: str, uploaded_files: List) -> Dict:
         API response with ranking results
     """
     try:
+        # Validate inputs before processing
+        if not jd_text or not jd_text.strip():
+            st.error("Please provide a Job Description.")
+            return None
+        
+        if not uploaded_files or len(uploaded_files) == 0:
+            st.error("Please upload at least one CV file.")
+            return None
+        
         # Prepare files for upload
         files = []
         for uploaded_file in uploaded_files:
@@ -2066,17 +2676,37 @@ def rank_cvs(jd_text: str, uploaded_files: List) -> Dict:
         )
         
         response.raise_for_status()
-        return response.json()
+        
+        # Validate response is not empty before parsing JSON
+        if not response.text or not response.text.strip():
+            st.error("Received empty response from server. Please try again.")
+            return None
+        
+        # Parse JSON response with error handling
+        try:
+            return response.json()
+        except ValueError as e:
+            st.error(f"Failed to parse server response: {str(e)}")
+            logger.error(f"JSON parse error. Response text: {response.text[:500]}")
+            return None
     
     except requests.exceptions.RequestException as e:
         st.error(f"Error processing request: {str(e)}")
         if hasattr(e, 'response') and e.response is not None:
             try:
-                error_detail = e.response.json()
-                st.error(f"Details: {error_detail.get('detail', 'Unknown error')}")
-            except:
+                # Validate response has content before parsing
+                if e.response.text and e.response.text.strip():
+                    error_detail = e.response.json()
+                    st.error(f"Details: {error_detail.get('detail', 'Unknown error')}")
+                else:
+                    st.error(f"Status Code: {e.response.status_code}")
+            except (ValueError, json.JSONDecodeError):
                 st.error(f"Status Code: {e.response.status_code}")
         return None
+
+
+
+
 
 
 def display_results(results: Dict):
@@ -2165,17 +2795,25 @@ def display_results(results: Dict):
         st.markdown(f"### ⭐ Top {len(top_k_candidates)} Shortlisted Candidates")
     
     for idx, candidate in enumerate(top_k_candidates, 1):
-        raw_score = candidate['match_score']
+        raw_score = candidate["match_score"]
         displayed_score = scale_score(raw_score)
-        score_class = "score-high" if displayed_score >= 70 else "score-medium" if displayed_score >= 50 else "score-low"
+        score_class = (
+            "score-high" if displayed_score >= 70
+            else "score-medium" if displayed_score >= 50
+            else "score-low"
+        )
         
         with st.expander(
             f"#{idx} {candidate['candidate_name']} - Match Score: {displayed_score:.1f}%",
-            expanded=True  # All top K candidates expanded by default
+            expanded=True
         ):
-            # Overall score (displayed with relative scaling)
-            st.markdown(f'<p class="{score_class}">Overall Match Score: {displayed_score:.1f}%</p>', unsafe_allow_html=True)
-            
+
+            # Overall score
+            st.markdown(
+                f'<p class="{score_class}">Overall Match Score: {displayed_score:.1f}%</p>',
+                unsafe_allow_html=True
+            )
+
             # Detailed scores
             detailed_scores = candidate.get("detailed_scores", {})
             if detailed_scores:
@@ -2191,6 +2829,10 @@ def display_results(results: Dict):
                     st.metric("Seniority", f"{detailed_scores.get('seniority', 0):.0f}%")
                 with score_cols[4]:
                     st.metric("Semantic", f"{detailed_scores.get('semantic', 0):.0f}%")
+            
+
+    
+
             
             # Matched skills
             matched_skills = candidate.get("matched_skills", [])
@@ -2328,6 +2970,62 @@ def display_results(results: Dict):
 
 def main():
     """Main application function"""
+    # ============================================
+    # RESET PASSWORD TOKEN CHECK (HIGHEST PRIORITY)
+    # ============================================
+    # Check for reset token at the VERY TOP, before any page routing
+    # This must execute BEFORE page state logic to prevent blank pages
+    try:
+        token = st.query_params.get("token", "")
+    except (AttributeError, Exception):
+        token = ""
+    
+    # If user is logged in, never show reset password page - redirect to main
+    if st.session_state.get("authenticated", False):
+        if token:
+            # Clear token from URL if user is already logged in
+            try:
+                st.query_params.clear()
+            except Exception:
+                pass
+        # Continue to main page routing below
+    
+    # Case: Reset link with token (from email) - user must NOT be authenticated
+    elif token:
+        # Validate token and render reset password page
+        reset_password_page(token)
+        st.stop()  # Stop execution to prevent further routing
+
+
+    
+    # ============================================
+    # AUTHENTICATION ROUTING
+    # ============================================
+    # Clear reset_completed flag if it was set
+    if st.session_state.get("reset_completed", False):
+        st.session_state.reset_completed = False
+    
+    # If not authenticated, show auth pages
+    if not st.session_state.authenticated:
+        # Route to appropriate auth page
+        if st.session_state.page == "signup":
+            signup_page()
+            return
+        elif st.session_state.page == "forgot":
+            forgot_password_page()
+            return
+        else:
+            # Default to login
+            login_page()
+            return
+    
+    # If authenticated but page is not main, set to main
+    if st.session_state.page != "main":
+        st.session_state.page = "main"
+    
+    # Sidebar visibility (already handled by CSS above)
+    
+    # Main HR AI Agent UI
     initialize_session()
     display_header()
     
@@ -2374,8 +3072,18 @@ def main():
             • Scores candidates on multiple factors  
             • Provides transparent ranking explanations  
             """)
+        
+        st.markdown("---")
+        
+        # Logout button
+        if st.button("🚪 Logout", use_container_width=True, type="secondary"):
+            st.session_state.clear()
+            st.session_state.page = "login"
+            st.session_state.authenticated = False
+            st.rerun()
     
     # Job Description Input Mode Selection
+    st.markdown('<div class="jd-mode-section">', unsafe_allow_html=True)
     st.markdown("### 📝 Job Description")
     jd_mode = st.radio(
         "How would you like to provide the Job Description?",
@@ -2383,6 +3091,7 @@ def main():
         horizontal=True,
         key="jd_mode_selector"
     )
+    st.markdown('</div>', unsafe_allow_html=True)
     
     st.session_state.jd_mode = jd_mode
     jd_text = ""
@@ -2429,12 +3138,24 @@ def main():
         
         # Multi-select for recommended skills
         if recommended_skills:
-            selected_recommended = st.multiselect(
-                "Recommended Skills",
-                options=recommended_skills,
-                help=f"Select relevant skills for {domain} domain",
-                key="recommended_skills_multiselect"
+
+            # Checkbox for select all
+            select_all = st.checkbox(
+                "Select all recommended skills",
+                key="select_all_skills"
             )
+
+            
+            # Determine selected values
+            if select_all:
+                selected_recommended = recommended_skills
+            else:
+                selected_recommended = st.multiselect(
+                    "Recommended Skills",
+                    options=recommended_skills,
+                    help=f"Select relevant skills for {domain} domain",
+                    key="recommended_skills_multiselect"
+                )
         else:
             selected_recommended = []
         
@@ -2607,7 +3328,10 @@ def main():
                 st.session_state.ranking_results = None
                 st.session_state.generated_jd = ""
                 st.rerun()
+    
 
 
 if __name__ == "__main__":
     main()
+
+

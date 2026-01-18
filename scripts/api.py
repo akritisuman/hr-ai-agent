@@ -16,6 +16,16 @@ from fastapi.responses import JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import uvicorn
+import models          # 👈 IMPORTANT: imports User model
+from database import init_db
+
+import models
+from database import init_db
+
+init_db()
+
+# rest of your api.py code below
+
 
 # Load environment variables
 load_dotenv()
@@ -25,6 +35,8 @@ from utils.security import SessionManager, SecurityValidator
 from ingestion import IngestionPipeline
 from agent import CVAnalysisAgent
 from ranking import RankingEngine
+from auth import auth_router
+from database import engine, Base
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -46,6 +58,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Include authentication router
+app.include_router(auth_router)
+
 # Initialize components
 session_manager = SessionManager()
 document_loader = DocumentLoader()
@@ -60,6 +75,10 @@ ranking_engine = None
 async def startup_event():
     """Initialize services on startup"""
     global ingestion_pipeline, analysis_agent, ranking_engine
+    
+    # Ensure database tables are created
+    Base.metadata.create_all(bind=engine)
+    logger.info("Database tables initialized")
     
     # Get API keys from environment
     pinecone_api_key = os.getenv("PINECONE_API_KEY")
